@@ -1,0 +1,171 @@
+/* style.css — فونت سیستمی، موبایل‌اول، هدف‌های لمسی ≥ ۴۸px */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+  background: #1b1830; color: #efeaf7; user-select: none; touch-action: none;
+}
+#game { position: fixed; inset: 0; display: block; image-rendering: pixelated; touch-action: none; }
+
+#topbar {
+  position: fixed; top: 0; inset-inline: 0; display: flex; align-items: center;
+  justify-content: space-between; padding: 8px 12px; pointer-events: none;
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+.title { font-size: 13px; font-weight: 700; opacity: .85; text-shadow: 0 2px 0 #0008; }
+.topbtns { display: flex; gap: 8px; align-items: center; pointer-events: auto; }
+.fps { font-size: 11px; opacity: .6; font-variant-numeric: tabular-nums; }
+.coins { display: flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 700; color: #ffe082; }
+.coinDot {
+  width: 14px; height: 14px; border-radius: 50%; display: inline-block;
+  background: radial-gradient(circle at 35% 30%, #ffe082, #e6b34d 60%, #a97b2c);
+  border: 1px solid #6b4f1d;
+}
+
+/* ن۴۰: سلکتور #dock با id واقعی (#dockFarm/#dockDungeon) جایگزین شد — قبلاً کل استایل داک بی‌اثر بود و
+   داک موبایل بالا می‌افتاد روی HUD */
+#dockFarm, #dockDungeon {
+  position: fixed; bottom: 0; inset-inline: 0; display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: linear-gradient(#141124f2, #141124ff); border-top: 1px solid #3a3654;
+}
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* ن۴۰: بذرها/چیپ‌ها در یک خط افقیِ اسکرول‌شو — داک دیگر نصف صفحه را نمی‌گیرد */
+#dockFarm .row, #dockDungeon .row { flex-wrap: nowrap; }
+#dockFarm .grp { flex-wrap: nowrap; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+#dockFarm .grp::-webkit-scrollbar { display: none; }
+#dockFarm .row.chips { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+#dockFarm .row.chips::-webkit-scrollbar { display: none; }
+#dockDungeon .row { overflow-x: auto; scrollbar-width: none; }
+#dockDungeon .row::-webkit-scrollbar { display: none; }
+#dockFarm .btn, #dockDungeon .btn, #dockFarm .chip, #dockDungeon .chip, #dockFarm .hlbl { flex-shrink: 0; }
+.lbl { font-size: 12px; opacity: .65; min-width: 36px; }
+.grp { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.btn {
+  min-height: 48px; min-width: 48px; padding: 4px 14px; font-size: 14px; font-weight: 600;
+  font-family: inherit; color: #d8d2ea; background: #2b2742; border: 1px solid #45406a;
+  border-radius: 10px; cursor: pointer; transition: transform .05s, background .1s, opacity .2s;
+}
+.btn:active { transform: scale(.94); }
+.btn.on { background: #4f7a3f; border-color: #79b364; color: #f4ffe9; box-shadow: 0 0 0 1px #79b36455; }
+.btn.dim { opacity: .45; }
+.btn.lang { min-width: 56px; }
+
+.btn.seed { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px; min-width: 74px; }
+.btn.seed canvas { display: block; image-rendering: pixelated; }
+.btn.seed .bl { font-size: 12px; }
+.btn.seed .pr { font-size: 11px; color: #ffe082; font-weight: 700; }
+.btn.sell { background: #7a5a2c; border-color: #c7a24e; color: #ffedb8; display: flex; align-items: center; gap: 6px; }
+.btn.sell b { color: #ffe082; }
+
+.chips { gap: 6px; }
+.chip {
+  display: flex; align-items: center; gap: 5px; background: #2b2742; border: 1px solid #45406a;
+  border-radius: 8px; padding: 3px 10px 3px 8px; font-size: 13px;
+}
+.chip canvas { display: block; image-rendering: pixelated; }
+
+#toast {
+  position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%) translateY(8px); /* ن۴۰: داک کوتاه شد */
+  background: #000c; border: 1px solid #45406a; color: #ffe; padding: 8px 16px; border-radius: 10px;
+  font-size: 13px; opacity: 0; transition: opacity .18s, transform .18s; pointer-events: none; white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.hint { font-size: 11.5px; opacity: .78; line-height: 1.55; } /* ن۴۰: کمرنگی از .55 → .78 */
+@media (min-height: 700px) { .hint { font-size: 12.5px; } }
+@media (max-height: 640px) { .hint { display: none; } } /* ن۴۰: صفحه‌ی کوتاه = ردیف کمتر */
+
+.btn.seed .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid #0006; margin-top: 2px; }
+.btn.seed { flex-direction: row; gap: 7px; justify-content: center; min-width: 84px; padding: 4px 10px; }
+.btn.bossb { background: #6e2f2f; border-color: #c76e6e; }
+
+/* --- دانجن --- */
+.stat { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; }
+.lblS { font-size: 11px; opacity: .6; font-weight: 400; }
+#hpWrap2 { position: fixed; top: 44px; inset-inline: 12px; pointer-events: none; z-index: 5; }
+#hpBar2 { height: 12px; background: #2b1d1d; border: 1px solid #6e4545; border-radius: 6px; overflow: hidden; }
+#hpFill2 { height: 100%; width: 100%; background: linear-gradient(#7ec46a, #4f8f45); transition: width .12s; }
+#bossBar { position: fixed; top: 62px; inset-inline: 12px; height: 16px; background: #2b1d1d; border: 1px solid #c76e6e; border-radius: 8px; overflow: hidden; display: none; pointer-events: none; z-index: 5; }
+#bossBar.show { display: block; }
+#bossFill { height: 100%; width: 100%; background: linear-gradient(#c95f5f, #8a2f2f); transition: width .15s; }
+#bossBar span { position: absolute; inset-inline: 0; text-align: center; font-size: 10px; line-height: 16px; color: #ffd9d9; }
+.skillB, .dashB { position: relative; overflow: hidden; flex: 1; min-height: 56px; font-size: 15px; }
+.skillB { background: #2d4a6e; border-color: #6e9fd4; color: #d6ecff; }
+.dashB { background: #5a4a7a; border-color: #a68ed4; color: #e8ddff; }
+.skillB::after, .dashB::after { content: ''; position: absolute; inset: 0; background: #0009; transform: scaleX(var(--cd, 0)); transform-origin: right; transition: transform .1s linear; }
+.skillB.ready, .dashB.ready { box-shadow: 0 0 12px #fff3; }
+#dead { position: fixed; inset: 0; background: #141124cc; display: none; align-items: center; justify-content: center; z-index: 50; }
+#dead.show { display: flex; }
+.deadBox { background: #221d38; border: 1px solid #6e4560; border-radius: 16px; padding: 26px 30px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
+.deadBox h2 { color: #e88; font-size: 22px; }
+.deadBox p { font-size: 14px; opacity: .85; line-height: 1.8; }
+
+/* --- اپ نهایی --- */
+.essChip { display: flex; align-items: center; gap: 4px; color: #9adcf0; font-weight: 700; font-size: 14px; }
+.essDot { width: 9px; height: 12px; background: #7ad0e8; border-radius: 2px; box-shadow: 0 0 6px #7ad0e888; display: inline-block; }
+.topL { display: flex; gap: 12px; align-items: center; pointer-events: none; }
+.menuB { min-width: 48px; font-size: 18px; }
+#dockDungeon { display: none; flex-direction: column; gap: 6px; }
+@media (max-width: 560px) { #dockFarm .lbl { display: none; } } /* ن۴۰: لیبل «بذر/انبار» روی موبایل حذف — خود آیکون‌ها گویا هستند */
+body.inDungeon #dockFarm { display: none; }
+body.inDungeon #dockDungeon { display: flex; }
+body.inDungeon #hpWrap2 { display: block; }
+#hpWrap2 { display: none; }
+.hlbl { font-size: 12px; opacity: .8; display: flex; gap: 3px; align-items: center; }
+.exitB { background: #4a6e3f; border-color: #79b364; color: #eaffdd; flex: 1; min-height: 56px; }
+.modal { position: fixed; inset: 0; background: #141124d9; display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+.modal.show { display: flex; }
+.modalBox { background: #221d38; border: 1px solid #45406a; border-radius: 16px; padding: 18px; width: min(420px, 94vw); max-height: 84vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.modalHead { display: flex; justify-content: space-between; align-items: center; }
+.modalHead h3 { font-size: 17px; }
+.btn.x { min-width: 44px; min-height: 44px; }
+.upgRow { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #2b2742; border: 1px solid #45406a; border-radius: 10px; padding: 8px 12px; }
+.upgInfo { display: flex; flex-direction: column; gap: 2px; }
+.upgInfo b { font-size: 14px; }
+.upgInfo .dots { color: #79b364; font-size: 11px; letter-spacing: 2px; }
+.upgInfo small { font-size: 10.5px; opacity: .6; }
+.upgBuy { min-width: 92px; min-height: 44px; font-size: 13px; background: #2d4a6e; border-color: #6e9fd4; color: #d6ecff; }
+.upgBuy.can { background: #4f7a3f; border-color: #79b364; color: #f4ffe9; }
+.upgBuy.maxed { background: #3a3654; opacity: .6; }
+.statsLine { font-size: 12px; opacity: .7; text-align: center; }
+.saveNote { font-size: 11px; opacity: .5; text-align: center; }
+.btn.danger { background: #6e2f2f; border-color: #c76e6e; color: #ffd9d9; }
+.wb { text-align: center; }
+.wb h3 { font-size: 19px; }
+.wbTime { font-size: 13px; opacity: .8; }
+.wbEarn { font-size: 26px; color: #ffe082; font-weight: 800; }
+.wbDetail { font-size: 13px; opacity: .75; }
+
+#banner {
+  position: fixed; top: 22%; left: 50%; transform: translateX(-50%) scale(.8); z-index: 40;
+  font-size: 22px; font-weight: 800; color: #ffd9d9; text-shadow: 0 2px 0 #000a, 0 0 18px #c94f4f88;
+  background: linear-gradient(#3a162add, #1d0f1ddd); border: 1px solid #c76e6e; border-radius: 14px;
+  padding: 12px 34px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+  letter-spacing: 1px;
+}
+#banner.show { opacity: 1; transform: translateX(-50%) scale(1); }
+#banner.small { font-size: 15px; padding: 8px 20px; }
+.chip canvas { image-rendering: pixelated; display: block; }
+.coins canvas { image-rendering: pixelated; display: block; }
+
+/* آیکون‌های پیکسلی (به‌جای ایموجی) */
+.pico { image-rendering: pixelated; display: inline-block; vertical-align: -4px; }
+.hlbl .pico { vertical-align: -5px; }
+.wbEarn .pico { vertical-align: -3px; }
+.upgBuy .pico { vertical-align: -2px; margin-inline-start: 5px; }
+.upgBuy .cost { vertical-align: 2px; }
+/* نقطه‌های سطح در منو */
+.lvlDot { width: 8px; height: 8px; border-radius: 50%; background: #3a3550; display: inline-block; margin-inline-start: 3px; border: 1px solid #0008; }
+.lvlDot.on { background: #ffd76a; box-shadow: 0 0 4px #ffd76a88; }
+
+/* محراب باستانی (نوبت ۲۰) */
+.shrineBox { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); z-index: 60; display: none;
+  background: rgba(16, 12, 30, 0.95); border: 2px solid #4a5468; border-radius: 10px; padding: 12px 14px; max-width: 360px; text-align: center; }
+.shrineBox.show { display: block; }
+.shrineBox h4 { margin: 0 0 10px; color: #b8e8ff; font-size: 14px; }
+.shrineBox .boons { display: flex; gap: 8px; }
+.shrineBox .boons button { flex: 1; min-height: 52px; cursor: pointer; }
+.qProg { color: #9aa4c0; font-size: 11px; margin-inline-start: 8px; }
+.qRw { display: inline-flex; align-items: center; gap: 4px; color: #e6c74a; font-weight: bold; }

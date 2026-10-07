@@ -1,0 +1,233 @@
+{
+ "farm_day": {
+  "size": [
+   195,
+   349
+  ],
+  "scale": 1,
+  "colors_exact": 155,
+  "colors_q4": 155,
+  "meanL": 97.9,
+  "stdL": 34.8,
+  "dark%": 8.4,
+  "bright%": 0.0,
+  "bloom%": 0.0,
+  "sat": 110.5,
+  "hue_dom%": 76.5,
+  "edge_bands": [
+   9.57,
+   3.21,
+   11.56
+  ],
+  "tile_flat": 0.8,
+  "detail%/tile": 20.0,
+  "sprite": {
+   "bgL": 112.3,
+   "sprL": 204.5,
+   "dL": 92.2
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 0.71,
+   "hard%": 11.1
+  }
+ },
+ "farm_night": {
+  "size": [
+   195,
+   349
+  ],
+  "scale": 1,
+  "colors_exact": 160,
+  "colors_q4": 153,
+  "meanL": 56.6,
+  "stdL": 20.1,
+  "dark%": 16.0,
+  "bright%": 0.0,
+  "bloom%": 0.0,
+  "sat": 122.8,
+  "hue_dom%": 85.4,
+  "edge_bands": [
+   5.97,
+   1.67,
+   6.5
+  ],
+  "tile_flat": 0.851,
+  "detail%/tile": 14.9,
+  "sprite": {
+   "bgL": 65.1,
+   "sprL": 117.5,
+   "dL": 52.4
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 3.64,
+   "hard%": 8.19
+  }
+ },
+ "farm_rain": {
+  "size": [
+   195,
+   349
+  ],
+  "scale": 1,
+  "colors_exact": 185,
+  "colors_q4": 181,
+  "meanL": 84.1,
+  "stdL": 29.9,
+  "dark%": 8.4,
+  "bright%": 0.0,
+  "bloom%": 0.0,
+  "sat": 113.8,
+  "hue_dom%": 90.3,
+  "edge_bands": [
+   8.95,
+   2.53,
+   9.63
+  ],
+  "tile_flat": 0.85,
+  "detail%/tile": 15.0,
+  "sprite": {
+   "bgL": 96.6,
+   "sprL": 175.0,
+   "dL": 78.4
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 0.81,
+   "hard%": 11.22
+  }
+ },
+ "farm_dusk": {
+  "size": [
+   195,
+   349
+  ],
+  "scale": 1,
+  "colors_exact": 164,
+  "colors_q4": 159,
+  "meanL": 61.5,
+  "stdL": 21.9,
+  "dark%": 15.4,
+  "bright%": 0.0,
+  "bloom%": 0.0,
+  "sat": 121.4,
+  "hue_dom%": 85.1,
+  "edge_bands": [
+   6.46,
+   1.79,
+   6.99
+  ],
+  "tile_flat": 0.851,
+  "detail%/tile": 14.9,
+  "sprite": {
+   "bgL": 70.7,
+   "sprL": 127.9,
+   "dL": 57.2
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 1.25,
+   "hard%": 10.59
+  }
+ },
+ "dungeon_f1": {
+  "size": [
+   195,
+   351
+  ],
+  "scale": 1,
+  "colors_exact": 794,
+  "colors_q4": 297,
+  "meanL": 52.3,
+  "stdL": 19.9,
+  "dark%": 15.1,
+  "bright%": 0.0,
+  "bloom%": 0.0,
+  "sat": 73.8,
+  "hue_dom%": 97.3,
+  "edge_bands": [
+   15.04,
+   9.48,
+   8.91
+  ],
+  "tile_flat": 0.551,
+  "detail%/tile": 44.9,
+  "sprite": {
+   "bgL": 88.5,
+   "sprL": 115.7,
+   "dL": 27.2
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 15.32,
+   "hard%": 13.0
+  }
+ },
+ "battle_f1": {
+  "size": [
+   195,
+   351
+  ],
+  "scale": 1,
+  "colors_exact": 847,
+  "colors_q4": 299,
+  "meanL": 52.7,
+  "stdL": 20.2,
+  "dark%": 14.9,
+  "bright%": 0.0,
+  "bloom%": 0.0,
+  "sat": 73.1,
+  "hue_dom%": 98.1,
+  "edge_bands": [
+   15.71,
+   9.27,
+   8.91
+  ],
+  "tile_flat": 0.548,
+  "detail%/tile": 45.2,
+  "sprite": {
+   "bgL": 88.5,
+   "sprL": 123.5,
+   "dL": 35.0
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 16.07,
+   "hard%": 13.17
+  }
+ },
+ "boss_f10": {
+  "size": [
+   195,
+   351
+  ],
+  "scale": 1,
+  "colors_exact": 1221,
+  "colors_q4": 490,
+  "meanL": 59.4,
+  "stdL": 28.7,
+  "dark%": 22.2,
+  "bright%": 0.1,
+  "bloom%": 0.0,
+  "sat": 47.6,
+  "hue_dom%": 29.5,
+  "edge_bands": [
+   14.33,
+   16.89,
+   20.01
+  ],
+  "tile_flat": 0.532,
+  "detail%/tile": 46.8,
+  "sprite": {
+   "bgL": 91.0,
+   "sprL": 185.0,
+   "dL": 94.0
+  },
+  "ground_period_px": 16,
+  "aa": {
+   "soft%": 9.69,
+   "hard%": 20.46
+  }
+ }
+}

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>مزرعه و دانجن</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<header id="topbar">
+  <div class="topL">
+    <span class="coins"><canvas id="coinIcon" width="18" height="18"></canvas><b id="coinN">60</b></span>
+    <span class="essChip"><canvas id="gemIcon" width="18" height="18" class="pico"></canvas><b id="essN">0</b></span>
+  </div>
+  <div class="topbtns">
+    <span id="fps" class="fps"></span>
+    <button id="lang" class="btn lang" data-i18n="lang"></button>
+    <button id="sndBtn" class="btn lang" aria-label="sound"><canvas id="sndIcon" width="20" height="20" class="pico"></canvas></button>
+    <button id="menuBtn" class="btn menuB" aria-label="menu"><canvas id="gearIcon" width="20" height="20" class="pico"></canvas></button>
+  </div>
+</header>
+
+<div id="hpWrap2"><div id="hpBar2"><div id="hpFill2"></div></div></div>
+<div id="bossBar"><div id="bossFill"></div><span data-i18n="bossName"></span></div>
+<div id="toast"></div>
+<div id="banner"><span data-i18n="bossName"></span></div>
+
+<div id="dockFarm">
+  <div class="row">
+    <span class="lbl" data-i18n="seeds"></span>
+    <div class="grp">
+      <button class="btn seed on" id="s-carrot"><span class="bl" data-i18n="carrot"></span><b class="pr" id="pr-carrot">8</b></button>
+      <button class="btn seed" id="s-wheat"><span class="bl" data-i18n="wheat"></span><b class="pr" id="pr-wheat">16</b></button>
+      <button class="btn seed" id="s-pumpkin"><span class="bl" data-i18n="pumpkin"></span><b class="pr" id="pr-pumpkin">32</b></button>
+      <button class="btn seed" id="s-strawberry" hidden><span class="bl" data-i18n="strawberry"></span><b class="pr" id="pr-strawberry">28</b></button>
+      <button class="btn seed" id="s-eggplant" hidden><span class="bl" data-i18n="eggplant"></span><b class="pr" id="pr-eggplant">48</b></button>
+      <button class="btn seed" id="s-corn" hidden><span class="bl" data-i18n="corn"></span><b class="pr" id="pr-corn">70</b></button>
+    </div>
+    <button class="btn sell" id="sell"><span data-i18n="sellAll"></span><b id="sellTotal">+0</b></button>
+  </div>
+  <div class="row chips">
+    <span class="lbl" data-i18n="inv"></span>
+    <div class="chip"><canvas id="ci-carrot" width="22" height="22"></canvas><b id="i-carrot">0</b></div>
+    <div class="chip"><canvas id="ci-wheat" width="22" height="22"></canvas><b id="i-wheat">0</b></div>
+    <div class="chip"><canvas id="ci-pumpkin" width="22" height="22"></canvas><b id="i-pumpkin">0</b></div>
+    <div class="chip f2" style="display:none"><canvas id="ci-strawberry" width="22" height="22"></canvas><b id="i-strawberry">0</b></div>
+    <div class="chip f2" style="display:none"><canvas id="ci-eggplant" width="22" height="22"></canvas><b id="i-eggplant">0</b></div>
+    <div class="chip f2" style="display:none"><canvas id="ci-corn" width="22" height="22"></canvas><b id="i-corn">0</b></div>
+    <span class="hlbl"><span data-i18n="landL2"></span> <b id="landN">1</b></span>
+    <span class="hlbl"><canvas id="hi-worker" width="18" height="18" class="pico"></canvas><b id="hl-worker">—</b></span>
+    <span class="hlbl"><canvas id="hi-sprinkler" width="18" height="18" class="pico"></canvas><b id="hl-sprinkler">—</b></span>
+    <span class="hlbl"><canvas id="hi-basket" width="18" height="18" class="pico"></canvas><b id="hl-basket">—</b></span>
+  </div>
+  <div class="hint" data-i18n="hintF"></div>
+</div>
+
+<div id="dockDungeon">
+  <div class="row">
+    <span class="stat"><span class="lblS" data-i18n="floorL"></span> <b id="floorN">1</b></span>
+    <span class="stat"><canvas id="gemIcon2" width="18" height="18" class="pico"></canvas><b id="essN2">0</b></span>
+    <span class="stat"><span class="lblS" data-i18n="killsL"></span> <b id="killN">0</b></span>
+  </div>
+  <div class="row">
+    <button class="btn skillB" id="skill"><b data-i18n="skill"></b></button>
+    <button class="btn dashB" id="dash"><b data-i18n="dash"></b></button>
+    <button class="btn exitB" id="exitD"><b data-i18n="exitD"></b></button>
+  </div>
+  <div class="hint" data-i18n="hintD"></div>
+</div>
+
+<div id="menu" class="modal">
+  <div class="modalBox">
+    <div class="modalHead"><h3 data-i18n="upgradeTitle"></h3><button class="btn x" id="menuClose" aria-label="close">×</button></div>
+    <div id="menuList"></div>
+    <p id="statsLine" class="statsLine"></p>
+    <p class="saveNote" data-i18n="autoSaveNote"></p>
+    <button class="btn danger" id="resetBtn" data-i18n="resetBtn"></button>
+  </div>
+</div>
+
+<div id="welcome" class="modal">
+  <div class="modalBox wb">
+    <h3 data-i18n="welcomeBack"></h3>
+    <p class="wbTime"><span data-i18n="awayFor"></span> <b id="wbTime"></b></p>
+    <p class="wbEarn"><canvas id="coinIcon2" width="18" height="18" class="pico"></canvas><b id="wbEarn"></b></p>
+    <p id="wbDetail" class="wbDetail"></p>
+    <p class="saveNote" data-i18n="offlineCapNote"></p>
+  </div>
+</div>
+
+<div id="dead">
+  <div class="deadBox">
+    <h2 data-i18n="youDied"></h2>
+    <p id="deadInfo"></p>
+    <button class="btn act" id="retry" data-i18n="retry"></button>
+    <button class="btn exitB" id="toFarm" data-i18n="exitD"></button>
+  </div>
+</div>
+
+<script type="module" src="js/main_app.js"></script>
+</body>
+</html>
