@@ -4,18 +4,18 @@
 > آخرین به‌روزرسانی: 2026-10-07 (پایان نوبت ۵۰ — فاز ۰ پروژه‌ی HD-2D).
 
 ## 🚨 اول هر نوبت
-1. سرور: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/game.html` — اگر 000: `start_process` با `cd /home/user/farm-dungeon && node serve.mjs`
+1. سرور: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/game.html` — اگر 000: `start_process` با `cd /home/user/farm-and-dungeon/farm-dungeon && node serve.mjs`
 2. /tmp پاک شده — بازسازی: `mkdir -p /tmp/realtest && cd /tmp/realtest && npm init -y && npm install jsdom canvas`
 3. بعد از هر `node tools/build_single.mjs` **حتماً بوت jsdom** — بیلدر بی‌سینتکس‌چک است و exportها را در اسکوپ مشترک می‌ریزد (ن۳۴ دوباره گرفت!)
 4. **محیط بصری (HD-2D) پاک می‌شود چون در مسیرهای حذف‌شده‌ی snapshot است** (`node_modules` و `.cache`):
    `mkdir -p /home/user/qa-env && cd /home/user/qa-env && printf '{"name":"qa","private":true}\n' > package.json && npm i playwright@1.63.0 && sudo npx playwright install-deps chromium && npx playwright install chromium`
    سپس فلگ‌ها: `--use-angle=swiftshader --enable-unsafe-swiftshader --no-sandbox --disable-dev-shm-usage` · تست: `node tools/audit0.mjs`
-5. گیت: مخزن در `/home/user/farm-dungeon` (root ریپو = پوشه‌ی والد این پوشه نیست؛ layout: `farm-dungeon/` + `farm-dungeon-fixed.zip` در ریشه‌ی ریپو) — `.git/config` در snapshot **ذخیره نمی‌شود** → هر نوبت remote/توکن باید از کاربر گرفته شود:
+5. گیت: ریشه‌ی ریپو = `/home/user/farm-and-dungeon` (شامل `.git`, پوشه‌ی بازی `farm-dungeon/`, و `farm-dungeon-fixed.zip`) — `.git/config` در snapshot **ذخیره نمی‌شود** → هر نوبت remote/توکن باید از کاربر گرفته شود:
    `git remote set-url origin https://x-access-token:<TOKEN>@github.com/amirrezahadipoor/farm-and-dungeon.git` → `git add -A && git commit -m "..." && git push`
 
 ## 🗺 نقشه‌ی فایل‌ها (سورس حقیقت — ۱۰۸ ماژول JS؛ شمار خط واقعی در ⟨⟩؛ سقف ۲۸۰)
 ```
-farm-dungeon/   (کل ورک‌اسپیس ۲٫۵MB — بیرون فقط uploads/image-1.png آرت مرجع کاربر)
+farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی والد؛ کنار آن `farm-dungeon-fixed.zip` — zip بعد از هر فاز بازتولید و کامیت می‌شود)
 ├── game.html ⭐ باندل تک‌فایل ۴۳۱٬۵۵۱B = ۱۰۸ ماژول + CSS اینلاین (تنها خروجی بیلدر؛ md5 ۵۴۲e۷۰… قبل از ن۵۰)
 ├── index.html (ورودی بیلدر: شل + اسکریپت main_app) · css/style.css (تنها CSS) · serve.mjs (:8080 no-store) · MEMORY.md · PHASE0.md (گزارش فاز ۰ HD-2D)
 ├── shots/ (۶ قدیمی + ۱۹ فاز ۰): stage47_elites.gif · stage47_montage.png · art48_review.png · mobs44_sheet.png · tiles43_sheet.png · font41_sheet.png
