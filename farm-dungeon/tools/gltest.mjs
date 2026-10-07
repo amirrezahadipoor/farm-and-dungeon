@@ -6,6 +6,7 @@ const require = createRequire('/home/user/qa-env/index.js');
 const { chromium } = require('playwright');
 const OUT = new URL('../shots/', import.meta.url).pathname;
 const MODE = process.argv[3] || 'gl';
+const PFX = process.argv[4] || 'p1';
 const URL_ = (process.argv[2] || 'http://localhost:8080/game.html') + (MODE === 'cpu' ? '?cpu=1' : '?gl=1');
 const PNG = (b64, name) => fs.writeFileSync(OUT + name, Buffer.from(b64.split(',')[1], 'base64'));
 
@@ -26,7 +27,8 @@ async function shot(tag, waitMs = 700) {
   await page.waitForTimeout(waitMs);
   const d = await page.evaluate(() => window.__glDiag());
   const png = await page.evaluate(() => window.__glPng());
-  const T = MODE === 'cpu' ? 'p1c_' : 'p1_';
+  const T = MK();
+  function MK() { return MODE === 'cpu' ? PFX + 'c_' : PFX + '_'; }
   if (png && png.length > 2000) { PNG(png, T + tag + (MODE === 'cpu' ? '_cpu.png' : '_gl.png')); rep.shots.push(T + tag + (MODE === 'cpu' ? '_cpu.png' : '_gl.png')); }
   await page.screenshot({ path: OUT + T + tag + '_dom.png' });
   rep.shots.push(T + tag + '_dom.png');

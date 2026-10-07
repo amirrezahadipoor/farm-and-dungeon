@@ -9,8 +9,8 @@
   "soils": 1,
   "crops": 1,
   "movedPx": 238,
-  "rainQuads": 18,
-  "nightQuads": 19,
+  "rainQuads": 35,
+  "nightQuads": 37,
   "errs": [],
   "ok": true
  },
@@ -19,8 +19,8 @@
    "hp": 100,
    "floor": 1,
    "pos": [
-    440,
-    40
+    24,
+    152
    ]
   },
   "afterSkill": {
@@ -29,9 +29,9 @@
   "end": {
    "floor": 2,
    "hp": 100,
-   "quads": 10,
-   "draws": 3,
-   "lights": 4
+   "quads": 22,
+   "draws": 5,
+   "lights": 3
   },
   "errs": [],
   "ok": true
@@ -39,19 +39,19 @@
  "ctxLoss": {
   "lost": "lost",
   "before": {
-   "quads": 14,
-   "draws": 2
+   "quads": 27,
+   "draws": 3
   },
   "during": {
    "glOK": false,
-   "quads": 14,
-   "time": 2.3
+   "quads": 27,
+   "time": 2.2
   },
   "after": {
    "glOK": true,
-   "quads": 14,
-   "draws": 2,
-   "bakes": 12,
+   "quads": 27,
+   "draws": 3,
+   "bakes": 16,
    "glErr": 0
   },
   "errs": [],

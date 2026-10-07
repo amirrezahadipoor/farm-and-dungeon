@@ -5,6 +5,7 @@ import { glAtlas } from './gl_batch.js';
 import { TILE } from './palette_env.js';
 
 const BC = new Map();
+const POOL_C = [[255, 170, 92], [176, 214, 255], [140, 255, 196], [150, 186, 255], [150, 255, 170], [255, 198, 122]];
 export function glBakeCount() { return BC.size; }
 function bake(key, w, h, fn) {
   let ras = BC.get(key);
@@ -34,6 +35,30 @@ export const BK = {
     const c = ph ? [230, 199, 74, 255] : [242, 239, 228, 255];
     r.rect(0, 0, 4, 1, c); r.rect(0, 0, 1, 4, c); r.rect(17 - 3, 0, 4, 1, c); r.rect(17, 0, 1, 4, c);
     r.rect(0, 17, 4, 1, c); r.rect(0, 17 - 3, 1, 4, c); r.rect(17 - 3, 17, 4, 1, c); r.rect(17, 17 - 3, 1, 4, c);
+  }),
+  // دکال سایه/تماس (فاز ۲): بیضی نرم تیره — زیر اشیا روی صفحه‌ی زمین
+  ao: (w, h, k) => bake('ao' + w + '_' + h + '_' + k, w, h, (r) => {
+    const cx = (w - 1) / 2, cy = (h - 1) / 2, RX = w / 2, RY = h / 2;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const dx = (x - cx) / RX, dy = (y - cy) / RY, d2 = dx * dx + dy * dy;
+      if (d2 >= 1) continue;
+      const a = Math.round(150 * k * Math.pow(1 - d2, 1.6));
+      if (a > 3) r.px(x, y, [9, 8, 20, a]);
+    }
+  }),
+  // کارت نور (lightmap رویه‌ای، فاز ۲): بیضی گرم/سرد با افت نرم — حوضه‌ی نور روی زمینِ تخت
+  // kind: ۰ مشعل، ۱ قهرمان، ۲ shrine، ۳ پله، ۴ essence، ۵ پنجره‌ی خانه
+  pool: (r0, kind, peak) => bake('lp' + r0 + '_' + kind + '_' + peak, r0 * 2, Math.round(r0 * 1.3), (ras) => {
+    const col = POOL_C[kind] || POOL_C[0], w = ras.w, h = ras.h;
+    const cx = (w - 1) / 2, cy = (h - 1) / 2, RX = w / 2, RY = h / 2, pk = peak / 100;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const dx = (x - cx) / RX, dy = (y - cy) / RY, d2 = dx * dx + dy * dy;
+      if (d2 >= 1) continue;
+      const f = 1 - d2, a = Math.round(255 * pk * Math.pow(f, 2.0) * (0.97 + 0.06 * ((x * 7 + y * 13) % 5) / 5));
+      if (a < 4) continue;
+      const b = 0.70 + 0.30 * f + 0.35 * Math.pow(f, 3); // هسته‌ی روشن‌تر
+      ras.px(x, y, [Math.min(255, col[0] * b) | 0, Math.min(255, col[1] * b) | 0, Math.min(255, col[2] * b) | 0, a]);
+    }
   }),
   white: () => bake('w1', 2, 2, (r) => r.rect(0, 0, 2, 2, [255, 255, 255, 255])),
 };

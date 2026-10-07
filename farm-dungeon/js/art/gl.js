@@ -1,27 +1,63 @@
 // art/gl.js — هسته‌ی رندر GPU (فاز ۱ HD-2D): کانتکست WebGL2، شیدر زمین/اسپرایت/اورلی و بوت.
 // باتچر/اطلس/مش در art/gl_batch.js. مسیر CPU دست‌نخورده = fallback کامل (jsdom/بدون WebGL2).
 export const GLR = { ok: false, gl: null, w: 0, h: 0, vp: new Float32Array([2, 2]), uscale: 1, flash: 0, quads: 0, draws: 0, lost: false, restores: 0 };
-export const MAXL = 24, MAXQ = 1400, VERT = 11;
-export const GLT = { ground: 0, atlas: 0, cw: 512, ch: 384, lights: new Float32Array(MAXL * 4), n: 0, dark: new Float32Array([13 / 255, 11 / 255, 26 / 255]) };
+export const MAXL = 24, MAXQ = 1400, VERT = 13;
+export const GLT = {
+  ground: 0, atlas: 0, ui: 0, wx: 0, cw: 512, ch: 384, n: 0,
+  lights: new Float32Array(MAXL * 4), lightsC: new Float32Array(MAXL * 4),
+  sun: new Float32Array([0.25, -0.6, 0.9]), sunC: new Float32Array([1, 0.96, 0.9, 0.4]), relief: 1,
+  dark: new Float32Array([13 / 255, 11 / 255, 26 / 255]),
+};
 
 const COMMON = `
-uniform vec4 u_light[${MAXL}];
+uniform vec4 u_light[${MAXL}];    // x,y صفحه‌ای | z شعاع | w قدرت 0..1
+uniform vec4 u_lightC[${MAXL}];   // rgb رنگ | a ارتفاع (px)
 uniform int u_nl;
-uniform vec3 u_dark;
-uniform vec4 u_tint;
+uniform vec3 u_dark;              // رنگ محیط در تاریکی کامل
+uniform vec4 u_tint;              // rgb تینت محیط | a مقدار تاریکی 0..255
+uniform vec3 u_sun;               // جهت به‌سوی خورشید/ماه (فضای صفحه)؛ z = ارتفاع
+uniform vec4 u_sunC;              // rgb رنگ خورشید | a شدت
 uniform float u_flash;
-vec3 lightAt(vec2 p) {
+// افت نور: درجه‌دو صاف + کمی wrap — نور رنگی و ارتفاع‌دار (فاز ۲)
+float attenAt(vec2 p, int i) {
+  vec4 L = u_light[i];
+  vec2 d = L.xy - p;
+  float q = dot(d, d) / (L.z * L.z);
+  if (q >= 1.0) return 0.0;
+  float a = 1.0 - q;
+  return a * a * L.w;
+}
+vec3 lightSum(vec2 p, vec3 n) {
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < ${MAXL}; i++) {
+    if (i >= u_nl) break;
+    float at = attenAt(p, i);
+    if (at <= 0.0) continue;
+    vec4 C = u_lightC[i];
+    vec2 d = u_light[i].xy - p;
+    vec3 dir = normalize(vec3(d, C.a * 0.35 + 2.0));
+    float ndl = max(dot(n, dir), 0.0) * 0.78 + 0.22 * n.z; // لبه‌ی نرم (wrap)
+    acc += C.rgb * (at * ndl);
+  }
+  return acc;
+}
+vec3 ambientAt(vec2 p) {
   float a = u_tint.a;
   for (int i = 0; i < ${MAXL}; i++) {
     if (i >= u_nl) break;
     vec4 L = u_light[i];
-    float dx = p.x - L.x, dy = p.y - L.y;
-    float k = 1.0 - (dx * dx + dy * dy) / (L.z * L.z);
-    if (k > 0.0) a -= L.w * k;
+    vec2 d = L.xy - p;
+    float q = dot(d, d) / (L.z * L.z);
+    if (q < 1.0) a -= 0.95 * L.w * (1.0 - q);
   }
-  if (a < 0.0) a = 0.0;
+  a = clamp(a, 0.0, 255.0);
   return mix(u_tint.rgb, u_dark, a / 255.0);
-}`;
+}
+vec3 sunAt(vec3 n) {
+  float k = max(dot(n, normalize(u_sun)), 0.0);
+  return u_sunC.rgb * (u_sunC.a * (0.30 + 0.70 * k));
+}
+float luma3(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }`;
 const PROJ = `
 uniform vec2 u_cam, u_view, u_ax, u_vp;
 uniform float u_persp, u_scale;
@@ -34,6 +70,7 @@ vec2 projW(vec2 w, out float kz) {
 vec4 toClip(vec2 p) {
   return vec4(p.x * u_scale / u_vp.x * 2.0 - 1.0, 1.0 - p.y * u_scale / u_vp.y * 2.0, 0.0, 1.0);
 }`;
+// ---------------- زمین: نرمال رویه‌ای از خودِ تکسچر (۴ نمونه) + AO از فرورفتگی ----------------
 const VS_GND = `#version 300 es
 layout(location = 0) in vec2 a_world;
 uniform vec2 u_org, u_tsize, u_ts;
@@ -49,39 +86,55 @@ void main() {
 const FS_GND = `#version 300 es
 precision mediump float;
 uniform sampler2D u_tex;
+uniform highp vec2 u_ts;  // اندازه‌ی تکسچر (گامِ نمونه‌ی نرمال) — دقت هم‌ارز ورتکس
+uniform float u_relief;   // 0..1 قدرت نرمال/AO (سطح کیفیت)
 in vec2 v_uv, v_sc;
 out vec4 o;
 ${COMMON}
 void main() {
   vec4 c = texture(u_tex, v_uv);
   if (c.a < 0.004) discard;
-  o = vec4(mix(c.rgb * lightAt(v_sc), vec3(1.0), u_flash), c.a);
+  vec2 tx = 2.0 / u_ts; // گام ۲px: پیکسل‌آرت لبه‌ی تیز دارد — گرادیان خام، نرمال را خرد می‌کند
+  float lx = luma3(texture(u_tex, v_uv + vec2(tx.x, 0.0)).rgb);
+  float lxd = luma3(texture(u_tex, v_uv - vec2(tx.x, 0.0)).rgb);
+  float ly = luma3(texture(u_tex, v_uv + vec2(0.0, tx.y)).rgb);
+  float lyd = luma3(texture(u_tex, v_uv - vec2(0.0, tx.y)).rgb);
+  vec2 g = clamp(vec2(lxd - lx, lyd - ly) * 0.5, vec2(-0.22), vec2(0.22)); // مهار دامنه
+  float relief = u_relief * 7.0;
+  vec3 n = normalize(vec3(-g.x * relief, -g.y * relief, 1.0));
+  float ao = clamp(1.0 - (abs(g.x) + abs(g.y)) * u_relief * 0.9, 0.82, 1.0); // AO ملایم، نه خفه‌کننده
+  vec3 col = c.rgb * (ambientAt(v_sc) * ao + lightSum(v_sc, n)) + c.rgb * sunAt(n);
+  o = vec4(mix(col, vec3(1.0), u_flash), c.a);
 }`;
+// ---------------- اسپرایت: mode 0 روبه‌دوربین، 1 UI بدون نور، 2 emissive، 3 دکالِ زمین‌تراز ----------------
 const VS_SPR = `#version 300 es
 layout(location = 0) in vec2 a_pos;
 layout(location = 1) in vec2 a_rel;
 layout(location = 2) in vec2 a_uv;
 layout(location = 3) in vec4 a_col;
 layout(location = 4) in float a_mode;
-out vec2 v_uv, v_sc;
+layout(location = 5) in vec2 a_r01;
+out vec2 v_uv, v_sc, v_r01;
 out vec4 v_col;
 flat out float v_mode;
 ${PROJ}
 void main() {
   float kz;
   vec2 p = projW(a_pos, kz);
-  if (a_mode > 0.5) { p = a_pos; kz = 1.0; }
+  if (a_mode > 0.5 && a_mode < 1.5) { p = a_pos; kz = 1.0; } // فقط UI صفحه‌ای
   v_sc = p;
   v_uv = a_uv;
   v_col = a_col;
   v_mode = a_mode;
-  vec2 rel = a_rel * u_ax.y; // اسپرایت با مقیاس یکنواخت (upright) — بدون کشیدگی افقی زمینِ شیب‌دار
+  v_r01 = a_r01; // 0..1 روی کوآد (بالا=0)
+  vec2 rel = a_rel * u_ax.y;
+  if (a_mode > 2.5) rel = vec2(a_rel.x * u_ax.x, a_rel.y * u_ax.y); // دکال روی صفحه‌ی زمین
   gl_Position = toClip(floor(p + rel * kz + 0.5));
 }`;
 const FS_SPR = `#version 300 es
 precision mediump float;
 uniform sampler2D u_tex;
-in vec2 v_uv, v_sc;
+in vec2 v_uv, v_sc, v_r01;
 in vec4 v_col;
 flat in float v_mode;
 out vec4 o;
@@ -89,27 +142,19 @@ ${COMMON}
 void main() {
   vec4 c = texture(u_tex, v_uv) * v_col;
   if (c.a < 0.004) discard;
-  vec3 lc = mix(c.rgb * lightAt(v_sc), c.rgb, step(0.5, v_mode));
-  o = vec4(mix(lc, vec3(1.0), u_flash), c.a);
+  vec3 col;
+  if (v_mode > 1.5 && v_mode < 2.5) {            // emissive: خودزدا در تاریکی + نور محیطی ملایم
+    float top = 1.0 - 0.18 * v_r01.y;
+    col = c.rgb * (1.12 + 0.30 * luma3(lightSum(v_sc, vec3(0.0, -0.4, 1.0)))) * top;
+  } else if (v_mode > 0.5) {
+    col = c.rgb;                                  // UI / دکال زمین: بدون نور
+  } else {                                       // روبه‌دوربین: نرمال رو به بالا-جلو
+    vec3 n = normalize(vec3(0.0, -0.42, 1.0));
+    float top = 1.0 - 0.10 * v_r01.y;
+    col = (c.rgb * (ambientAt(v_sc) + lightSum(v_sc, n)) + c.rgb * sunAt(n) * 0.8) * top;
+  }
+  o = vec4(mix(col, vec3(1.0), u_flash), c.a);
 }`;
-const VS_OVL = `#version 300 es
-layout(location = 0) in vec2 a_p;
-out vec2 v_uv;
-void main() { v_uv = a_p; gl_Position = vec4(a_p * 2.0 - 1.0, 0.0, 1.0); }`;
-const FS_OVL = `#version 300 es
-precision mediump float;
-uniform float u_fade, u_vig;
-uniform vec3 u_fill;
-in vec2 v_uv;
-out vec4 o;
-void main() {
-  vec2 q = v_uv * 2.0 - 1.0;
-  float a = 1.0 - u_fade;
-  float v = smoothstep(0.70, 1.40, length(q)) * u_vig * 0.55;
-  if (v > a) a = v;
-  o = vec4(u_fill, a);
-}`;
-
 function mkShader(gl, type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src); gl.compileShader(s);
@@ -146,6 +191,23 @@ export function mkTex(gl, w, h) {
 }
 
 // لایه‌های صفحه‌ای (افکت‌ها/آب‌وهوا): کوآد واحد با تکسچر خودشان
+export const VS_OVL = `#version 300 es
+layout(location = 0) in vec2 a_p;
+out vec2 v_uv;
+void main() { v_uv = a_p; gl_Position = vec4(a_p * 2.0 - 1.0, 0.0, 1.0); }`;
+const FS_OVL = `#version 300 es
+precision mediump float;
+uniform float u_fade, u_vig;
+uniform vec3 u_fill;
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec2 q = v_uv * 2.0 - 1.0;
+  float a = 1.0 - u_fade;
+  float v = smoothstep(0.70, 1.40, length(q)) * u_vig * 0.55;
+  if (v > a) a = v;
+  o = vec4(u_fill, a);
+}`;
 export const VS_LAY = `#version 300 es
 layout(location = 0) in vec2 a_p;
 uniform vec2 u_size, u_vp, u_uv;

@@ -53,7 +53,7 @@ app.hydrateFarm(farmScene);
 window.__app = app; window.__farm = farmScene; // برای تست
 let scale = 3, sc = null, offImg = null, _dockH = 0; // ارتفاع داک (ن۴۰) — برای پایش تغییر صحنه
 const CAM = { scale: 3, camX: 0, camY: 0 }; // بازمصرف — بدون آبجکت جدید در هر فریم
-let _emaMs = 8, _qFrames = 0; // پایش هزینه‌ی فریم برای کیفیت تطبیقی
+let _emaMs = 8, _qFrames = 0, _glBad = 0; // پایش هزینه‌ی فریم برای کیفیت تطبیقی
 const off = document.createElement('canvas');
 const offCtx = off.getContext('2d');
 
@@ -206,7 +206,12 @@ function loop(now) {
   }
   const g0 = scene === 'farm' ? farmScene : run;
   if (GLon) { // مسیر GPU: زمین شیب‌دار + billboard + نور/تینت/محو در شیدر
-    glScene(scene === 'farm' ? 'farm' : 'dungeon', farmScene, run, sc.w, sc.h, scale, S.getFade(), Q.level && scene !== 'farm' ? 1 : 0);
+    try {
+      glScene(scene === 'farm' ? 'farm' : 'dungeon', farmScene, run, sc.w, sc.h, scale, S.getFade(), Q.level && scene !== 'farm' ? 1.35 : 0);
+    } catch (e) { // نگهبان حلقه (ن۵۳): خطای یک فریم نباید بازی را قفل کند — افت به CPU
+      if (!_glBad) { _glBad = 1; console.error('glScene:', e && e.message); }
+      GLR.ok = false;
+    }
     S.applyFade(sc, dt); // فقط پیشبرد وضعیت گذار مشکی (تصویر GPU جداست)
     if (window.__glCap) { window.__glCap = 0; window.__glShot = shotURL(); }
   } else {
@@ -257,7 +262,8 @@ function shotURL() {
   c2.putImageData(im, 0, 0);
   return c.toDataURL('image/png');
 }
-window.__cmd = (x, y) => farmScene.command(x * TILE + 8, y * TILE + 8); window.__glRas = glGroundRas; window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
+window.__cmd = (x, y) => farmScene.command(x * TILE + 8, y * TILE + 8); window.__glRas = glGroundRas;
+window.__glStat = () => ({ quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, decals: GSTAT.decals, sun: GSTAT.sun.map((v) => +v.toFixed(2)) }); window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
 window.__glBakes = glBakeCount; window.__glCapture = () => { window.__glCap = 1; return true; };
 window.__glPng = () => window.__glShot || '';
 window.__glRest = () => ({ restores: GLR.restores, ok2: GLR.ok2, ok: GLR.ok, progs: !!GLR.progs, h: typeof (glCv && glCv.onwebglcontextrestored) });

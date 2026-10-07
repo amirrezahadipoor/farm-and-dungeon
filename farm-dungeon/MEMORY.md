@@ -1,7 +1,7 @@
 # 🧠 MEMORY — بازی «مزرعه و دانجن»
 
 > حافظه‌ی عامل: **نقشه‌ی فایل‌ها (دقیق/per-file)** + وضعیت خطی + اعداد + درس‌ها + قواعد کاربر.
-> آخرین به‌روزرسانی: 2026-10-07 (پایان نوبت ۵۱ — فاز ۱ پروژه‌ی HD-2D: رندرر GPU + دوربین دیوراما).
+> آخرین به‌روزرسانی: 2026-10-07 (پایان فاز ۲ پروژه‌ی HD-2D: نورپردازی — نور رنگی/چرخه‌ی روز‌شب/AO/emissive، نمره ۲۵/۷۰، جزئیات `PHASE2.md`).
 
 ## 🚨 اول هر نوبت
 1. سرور: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/game.html` — اگر 000: `start_process` با `cd /home/user/farm-and-dungeon/farm-dungeon && node serve.mjs`
@@ -31,7 +31,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
     ├── مزرعه ⟨۱۱⟩: game⟨199⟩ حرکت/صف/سیب · game_apply⟨71⟩ ابزار+اقتصاد برداشت · farm⟨134⟩ گرید+CROPS+WATER_TIME+soak/_wetBare
     │   · farm_layout⟨76⟩ · farm_command⟨90⟩ تپ→nearFree · farm_worker⟨184⟩ · farm_render⟨149⟩ (flatOnly)
     │   · app⟨201⟩ UPG/MEALS/آفلاین/serializeFarm · app_ui⟨127⟩ چسب DOM · ui_hud⟨69⟩ · ui_shrine⟨48⟩
-    ├── دانجن ⟨۱۱+۲۲⟩: main_app⟨260⟩ بوت/ورودی/حلقه/سیو + بوت دوگانه GPU/CPU + پنل دیباگ G (entry بیلدر — «یتیم» نیست!) · main_scene⟨99⟩ fade/ورود-خروج/bankRun
+    ├── دانجن ⟨۱۱+۲۲⟩: main_app⟨280⟩ بوت/ورودی/حلقه/سیو + بوت دوگانه GPU/CPU + پنل دیباگ G + نگهبان حلقه (`_glBad` → افت به CPU) · main_scene⟨99⟩ fade/ورود-خروج/bankRun
     │   · run⟨255⟩ حرکت/طبقه/مهارت/دوج/برکت/chill-ریست · run_combat⟨90⟩ حمله‌ی خودکار/runHit · run_loot⟨83⟩ · run_render⟨228⟩ (تاج بعد از اسپرایت، اسپلش زیر موجودیت‌ها، flatOnly)
     │   · dungeon⟨125⟩ انتخاب+قرینه ۵۰٪+تم · dungeon_blueprints⟨66⟩ رجیستری+validate
     │   · dungeon/ (۲۲ فایل ~۲۷ خطی): bp01…bp21.js + bp_boss.js — هرکدام `export const BPXX={name,rows}` ۳۰×۲۰
@@ -39,8 +39,8 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
     ├── art/ ⟨۲۶⟩: پالت — palette_env⟨38⟩ P→E+کش اسپرایت · palette_hero⟨36⟩ · recolor⟨38⟩ · quality⟨3⟩
     │   · محیط — ground⟨227⟩ DTHEME×۴+فرش+آب زنده · dungeon_depth⟨42⟩ DPAL تک‌منبع · dungeon_props⟨111⟩ · farm_decor⟨73⟩
     │   │   · farm_buildings⟨110⟩ · tree⟨53⟩ · weather⟨91⟩ · critters⟨64⟩ · light⟨69⟩ applyDarkness+LUT · rim⟨22⟩
-    │   · GPU فاز ۱ — gl⟨191⟩ هسته WebGL2+شیدرها+boot/readback · gl_batch⟨180⟩ آطلس/مش/batcher/لایه‌ها · glbake⟨67⟩ پخت رویه‌ای+متن+مینی‌مپ
-│   │   · render_gl⟨240⟩ دوربین دیوراما+y-sort+نور+لایه‌ی افکت/آب‌وهوا (مسیر CPU = fallback؛ `render(r).flatOnly` = فریم زمین)
+    │   · GPU — gl⟨259⟩ هسته WebGL2+شیدرها (lightSum/attenAt/ambientAt/sunAt، مودهای اسپرایت ۰نورپذیر/۱UI/۲emissive/۳دکال)+boot/readback · gl_batch⟨197⟩ آطلس/مش/batcher/لایه‌ها/پاس دکال+آپلود نور · glbake⟨92⟩ پخت رویه‌ای+متن+مینی‌مپ+`BK.ao`+`BK.pool` (کارت نور)
+│   │   · render_gl⟨278⟩ دوربین دیوراما+y-sort+`cycle()` (خورشید/ماه+تینت رنگی)+نورها+حوضه‌ی نور+Ao+لایه‌های fx/wx (مسیر CPU = fallback؛ `render(r).flatOnly` = فریم زمین)
 │   · قهرمان — hero_pose⟨131⟩ ریاضی پوز+HOX/HOY · hero⟨243⟩ رسم+halfSprite · equipment⟨99⟩
     │   · هیولا — monster_parts⟨73⟩ MC/MOX/MOY/MHEAD(۱۴جور) · monster_bodies⟨280⟩ ۷ کلاسیک→MBODY_A · monster_bodies2⟨261⟩ ۷ نوی۴۴
     │   │   · monster_registry⟨6⟩ ادغام→MBODY/MOUT/MSHW تک‌منبع · monsters⟨26⟩ فریم: body→rim→outline→فلش→سایه · boss⟨129⟩ گولم‌لرد ۳فاز
@@ -56,6 +56,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 - ن۴۹: **باگ‌های ظاهری + پولیش** — (۱) تایل‌های fence/fencePost شفاف بودند (بدون چمن زیرشان → سیاهی/ردّ فریم قبل روی بوم) → چمن زیرشان در farm_render · (۲) خاک‌راه: تایل‌های «نان‌مانند» جدا → تایل پر + حاشیه‌ی دندانه‌ای per-همسایه `drawPathEdge` (farm_decor) + سنگ‌ریزه‌ی پراکنده · (۳) دروازه‌ی ۲×۲ دو در روی هم بود → طاق یکپارچه (variant 0 سردر / 1 آستانه) · (۴) گندم رسیده شبیه «میز» → سه سنبله‌ی طلایی با ریشک · (۵) فونت font2: حروف کوچک لاتین «؟» می‌شدند (Floor→F????) → نگاشت به بزرگ؛ نیم‌فاصله‌ی U+200C «؟» رسم می‌شد → حذف؛ ارقام داخل جمله‌ی فارسی برعکس بودند (۱۲۳→۳۲۱) → bidi ردیف‌های LTR؛ alias آ/أ/ي/ك/٪/—/→ و گلیف ( ) = ·؛ ۳ شبیه «؟» بود → سه‌قوسی · بیلد+بوت jsdom صفر خطا · شفافیت: صفر پیکسل alpha=0 در مزرعه و ۵ طبقه‌ی دانجن
 - ن۴۷: ۶ فیکس — تاج نخبه MHEAD per-kind (۱۴ جور کالیبره از رندر واقعی) + تاج بعد از اسپرایت (خز وسطش را می‌خورد) + اسپلش زیر موجودیت‌ها + صدای shoot/fire + chill ریست + monster_registry (همه ≤۲۸۰ خط) · wire سخت‌گیر BASE∪entry 108/108 (۲ صدا import می‌شدند ولی باندل نبودند!) · qa_all 52 · elite47 4/4 · stage47_elites.gif+montage
 - ن۴۶: پاکسازی ۲۰MB→۴٫۹MB؛ ن۴۷ پالایش به سیاست «فقط فایل جاری» → ۲٫۵MB
+- ن۵۲ 💡 **فاز ۲ پروژه‌ی HD-2D — نورپردازی**: `cycle()` خورشید/ماه + تینت رنگی محیط · نور نقطه‌ای رنگی با N·L و افت شعاعی (≤۲۴: قهرمان/مشعل فلیکر/محراب پالس/پله/essence/پنجره) · کارت نور (lightmap رویه‌ای mode 3) برای حوضه‌ی گرم/سرد · AO تماس + سایه‌ی جهت‌دار از خورشید · emissive (پنجره‌ی خانه/شعله/نخبه) · تینت شب آبی‌فام عمیق + وینیت دانجن ۱٫۳۵ · **راستی‌آزمایی**: نسبت شب/روز ۰٫۵۹→۰٫۳۴ · dark% دانجن ۵٫۰→۳۳٫۰ · pool نبرد ۲٫۲۶→۳٫۴۹ · flat16 ۰٫۹۱→۰٫۷۷ · بنچ ≤۱٫۴۴ms (SwiftShader) · boot1/smoke1/CPU-gltest/jsdom همه PASS · ۵ باگ مسیر (تخصیص ایمن `DEC[dn]`، نگهبان حلقه، نرمال ۲px، کارت نور، exportهای گم‌شده) · **نمره ۱۷/۷۰→۲۵/۷۰** · شیت `shots/p2_sheet.png` · جزئیات `PHASE2.md` · فایل‌ها همه ≤۲۸۰ خط
 - ن۴۵: ۱۱ کلید i18n مرده + maxHp ابزارها→run.maxHp · فازر ۴۰سیید×۲۴طبقه صفر کرش · مرورگر ۴ سیید پاک
 - ن۴۴: ۷ موب متمایز (mummy/archer/ram/yeti/imp/bandit/hare) + پرتابه‌ها + اسپاون امضایی nsig
 - ن۴۳: تایل‌ست — درز رگه‌ای *4 · glint per تم · ۴ واریانت وزن‌دار · DPAL تک‌منبع (شیت tiles43)
@@ -159,6 +160,7 @@ node /tmp/realtest/boot42.mjs     # ۱۰ بوت jsdom (نصب: npm i jsdom canva
 node tools/bench.mjs              # فقط میانه‌ی هم‌پروسه
 node tools/audit0.mjs && python3 tools/analyze0.py   # فاز ۰: Playwright سه‌نما + شیت/سنجه (نیازمند نصب مجدد محیط)
 ```
+- **درس فاز ۲**: (ن۵۳) نور روی سطح تخت با N·L حوضه نمی‌سازد → کارت نور (lightmap) لازم است · `DEC[dn] || (DEC[dn] = {})` الگوی ایمن هر صف شیئی است (بی‌آن، حلقه‌ی رندر می‌مرد و اعداد تست دروغ می‌شوند) · خطای یک فریم GPU → افت به CPU، هرگز قفل · نرمال از گرادیان ۱px خرد می‌شود (گام ۲px + clamp ±۰٫۲۲ + relief ۷) · `u_light` را فقط برنامه‌ی زمین دارد و `highp` باید دو طرف یکی باشد · بعد از هر بازنویسی شیدر، VS_OVL/FS_OVL/VS_LAY را دوباره export کن
 - بعد از هر ماژول جدید: چک wire «BASE∪entry» (الگوی ن۴۷) + بوت jsdom
 - بعد از هر تغییر dungeon/blueprint: ممیزی دسترس‌پذیری (flood-fill + A* از اسپاون به صندوق/محراب/پله، ۲۰۰ سیید)
 - بوت jsdom: beforeParse + جمع خطاها · pretendToBeVisual · ورود دانجن `__farm.onGate()` · خروج `#exitD` · گذار ~۱٫۲ث

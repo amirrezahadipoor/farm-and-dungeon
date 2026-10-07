@@ -42,12 +42,13 @@ export function glBatchInit() {
   SB.vbo = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, SB.vbo);
   gl.bufferData(gl.ARRAY_BUFFER, SB.data.byteLength, gl.DYNAMIC_DRAW);
-  const st = VERT * 4;
+  const st = VERT * 4; // ۱۳ فلوat: pos2 rel2 uv2 col4 mode1 r01(2)
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, st, 0);
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 8);
   gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, st, 16);
   gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 24);
   gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, st, 40);
+  gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 2, gl.FLOAT, false, st, 44);
   const idx = new Uint16Array(MAXQ * 6);
   for (let i = 0; i < MAXQ; i++) { const b = i * 4, q = i * 6; idx[q] = b; idx[q + 1] = b + 1; idx[q + 2] = b + 2; idx[q + 3] = b; idx[q + 4] = b + 2; idx[q + 5] = b + 3; }
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
@@ -119,11 +120,21 @@ export function glPush(rec, ax, ay, ox, oy, c, mode = 0) {
   for (let i = 0; i < 4; i++) {
     d[o++] = ax; d[o++] = ay; d[o++] = xs[i]; d[o++] = ys[i]; d[o++] = us[i]; d[o++] = vs[i];
     d[o++] = c[0]; d[o++] = c[1]; d[o++] = c[2]; d[o++] = c[3]; d[o++] = mode;
+    d[o++] = i === 1 || i === 2 ? 1 : 0; d[o++] = i >= 2 ? 1 : 0;
   }
   SB.n++;
 }
 export function glCam(cam, ax, persp, view, tint) { _p.cam = cam; _p.ax = ax; _p.persp = persp; _p.view = view; _p.tint = tint; }
-export function glLights(list, n) { GLT.n = n; if (n) GLT.lights.set(list.subarray(0, n * 4)); }
+export function glLights(list, cols, n) {
+  GLT.n = n;
+  if (n) { GLT.lights.set(list.subarray(0, n * 4)); GLT.lightsC.set(cols.subarray(0, n * 4)); }
+}
+// خورشید/ماه + قدرت نرمال/AO
+export function glSun(dir, col, k) {
+  GLT.sun[0] = dir[0]; GLT.sun[1] = dir[1]; GLT.sun[2] = dir[2];
+  GLT.sunC[0] = col[0]; GLT.sunC[1] = col[1]; GLT.sunC[2] = col[2];
+  GLT.sunC[3] = k;
+}
 function bindCam(gl, pr) {
   gl.uniform2fv(uni(pr, 'u_cam'), _p.cam);
   gl.uniform2fv(uni(pr, 'u_view'), _p.view);
@@ -135,7 +146,10 @@ function bindCam(gl, pr) {
   gl.uniform3fv(uni(pr, 'u_dark'), GLT.dark);
   gl.uniform4fv(uni(pr, 'u_tint'), _p.tint);
   gl.uniform4fv(uni(pr, 'u_light[0]'), GLT.lights);
+  gl.uniform4fv(uni(pr, 'u_lightC[0]'), GLT.lightsC);
   gl.uniform1i(uni(pr, 'u_nl'), GLT.n);
+  gl.uniform3fv(uni(pr, 'u_sun'), GLT.sun);
+  gl.uniform4fv(uni(pr, 'u_sunC'), GLT.sunC);
   gl.uniform1i(uni(pr, 'u_tex'), 0);
 }
 export function glFrame(cam, ax, persp, view, tint, org, tsize, step) {
@@ -149,6 +163,7 @@ export function glFrame(cam, ax, persp, view, tint, org, tsize, step) {
   gl.uniform2fv(uni(pr, 'u_org'), org);
   gl.uniform2fv(uni(pr, 'u_tsize'), tsize);
   gl.uniform2f(uni(pr, 'u_ts'), GLT.cw, GLT.ch);
+  gl.uniform1f(uni(pr, 'u_relief'), GLT.relief);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, GLT.ground);
   gl.bindVertexArray(m.vao);
