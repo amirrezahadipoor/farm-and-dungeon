@@ -1,7 +1,7 @@
 # 🧠 MEMORY — بازی «مزرعه و دانجن»
 
 > حافظه‌ی عامل: **نقشه‌ی فایل‌ها (دقیق/per-file)** + وضعیت خطی + اعداد + درس‌ها + قواعد کاربر.
-> آخرین به‌روزرسانی: 2026-10-07 (پایان فاز ۲ پروژه‌ی HD-2D: نورپردازی — نور رنگی/چرخه‌ی روز‌شب/AO/emissive، نمره ۲۵/۷۰، جزئیات `PHASE2.md`).
+> آخرین به‌روزرسانی: 2026-10-07 (پایان فاز ۳ پروژه‌ی HD-2D: هنر اسپرایت — رمپ ۵پله/sel-out/نور لبه، نمره ۲۹/۷۰، جزئیات `PHASE3.md`).
 
 ## 🚨 اول هر نوبت
 1. سرور: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/game.html` — اگر 000: `start_process` با `cd /home/user/farm-and-dungeon/farm-dungeon && node serve.mjs`
@@ -25,7 +25,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 │   · render5.mjs ⟨۱۵ رگرسیون⟩ · render6.mjs ⟨۲۷ پولیش⟩ · elite47.mjs ⟨۴ تست تاج+GIF نخبه → /tmp/qa47⟩
 │   · build_bp42.py (مولد/ولیداتور نقشه‌ها) · author_font41.py (منبع حقیقت فونت) · mobs44_sheet.mjs · tiles43_sheet.mjs · png.mjs · bench.mjs
 └── js/
-    ├── زیرساخت ⟨۱۲⟩: raster⟨174⟩ بوم پیکسل صفر-کپی · skeleton⟨120⟩ Locomotion/GAITS · tiles⟨7⟩ فاساد re-export · astar⟨44⟩
+    ├── زیرساخت ⟨۱۲⟩: raster⟨186⟩ بوم پیکسل صفر-کپی · skeleton⟨120⟩ Locomotion/GAITS · tiles⟨7⟩ فاساد re-export · astar⟨44⟩
     │   · fx⟨129⟩ ذرات/وینیت-فقط-دانجن · night⟨26⟩ LUT شب · i18n⟨126⟩ fa/en+t() · save⟨73⟩ v6+migrate · input⟨86⟩ کیبورد+لمس
     │   · ui⟨160⟩ توست/منو/آیکون · quests⟨51⟩ چرخان×۳ · items⟨79⟩ ۱۲ پوشیدنی+دراپ
     ├── مزرعه ⟨۱۱⟩: game⟨199⟩ حرکت/صف/سیب · game_apply⟨71⟩ ابزار+اقتصاد برداشت · farm⟨134⟩ گرید+CROPS+WATER_TIME+soak/_wetBare
@@ -39,8 +39,8 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
     ├── art/ ⟨۲۶⟩: پالت — palette_env⟨38⟩ P→E+کش اسپرایت · palette_hero⟨36⟩ · recolor⟨38⟩ · quality⟨3⟩
     │   · محیط — ground⟨227⟩ DTHEME×۴+فرش+آب زنده · dungeon_depth⟨42⟩ DPAL تک‌منبع · dungeon_props⟨111⟩ · farm_decor⟨73⟩
     │   │   · farm_buildings⟨110⟩ · tree⟨53⟩ · weather⟨91⟩ · critters⟨64⟩ · light⟨69⟩ applyDarkness+LUT · rim⟨22⟩
-    │   · GPU — gl⟨259⟩ هسته WebGL2+شیدرها (lightSum/attenAt/ambientAt/sunAt، مودهای اسپرایت ۰نورپذیر/۱UI/۲emissive/۳دکال)+boot/readback · gl_batch⟨197⟩ آطلس/مش/batcher/لایه‌ها/پاس دکال+آپلود نور · glbake⟨92⟩ پخت رویه‌ای+متن+مینی‌مپ+`BK.ao`+`BK.pool` (کارت نور)
-│   │   · render_gl⟨278⟩ دوربین دیوراما+y-sort+`cycle()` (خورشید/ماه+تینت رنگی)+نورها+حوضه‌ی نور+Ao+لایه‌های fx/wx (مسیر CPU = fallback؛ `render(r).flatOnly` = فریم زمین)
+    │   · GPU — gl⟨274⟩ هسته WebGL2+شیدرها (lightSum/attenAt/ambientAt/sunAt، **رمپ ۵پله‌ی هیو-شیفت + نور لبه در FS_SPR**، مودهای ۰نورپذیر/۱UI/۲emissive/۳دکال)+boot/readback · gl_batch⟨203⟩ آطلس/مش/batcher/لایه‌ها/پاس دکال+آپلود نور/`glRim`/سوییچ `?noramp=1` · glbake⟨92⟩ پخت رویه‌ای+متن+مینی‌مپ+`BK.ao`+`BK.pool`
+│   │   · render_gl⟨280⟩ دوربین دیوراما+y-sort+`cycle()`+`rimRun` (خورشید/ماه+تینت رنگی)+نورها+حوضه‌ی نور+Ao+لایه‌های fx/wx (مسیر CPU = fallback؛ `render(r).flatOnly` = فریم زمین)
 │   · قهرمان — hero_pose⟨131⟩ ریاضی پوز+HOX/HOY · hero⟨243⟩ رسم+halfSprite · equipment⟨99⟩
     │   · هیولا — monster_parts⟨73⟩ MC/MOX/MOY/MHEAD(۱۴جور) · monster_bodies⟨280⟩ ۷ کلاسیک→MBODY_A · monster_bodies2⟨261⟩ ۷ نوی۴۴
     │   │   · monster_registry⟨6⟩ ادغام→MBODY/MOUT/MSHW تک‌منبع · monsters⟨26⟩ فریم: body→rim→outline→فلش→سایه · boss⟨129⟩ گولم‌لرد ۳فاز
@@ -56,6 +56,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 - ن۴۹: **باگ‌های ظاهری + پولیش** — (۱) تایل‌های fence/fencePost شفاف بودند (بدون چمن زیرشان → سیاهی/ردّ فریم قبل روی بوم) → چمن زیرشان در farm_render · (۲) خاک‌راه: تایل‌های «نان‌مانند» جدا → تایل پر + حاشیه‌ی دندانه‌ای per-همسایه `drawPathEdge` (farm_decor) + سنگ‌ریزه‌ی پراکنده · (۳) دروازه‌ی ۲×۲ دو در روی هم بود → طاق یکپارچه (variant 0 سردر / 1 آستانه) · (۴) گندم رسیده شبیه «میز» → سه سنبله‌ی طلایی با ریشک · (۵) فونت font2: حروف کوچک لاتین «؟» می‌شدند (Floor→F????) → نگاشت به بزرگ؛ نیم‌فاصله‌ی U+200C «؟» رسم می‌شد → حذف؛ ارقام داخل جمله‌ی فارسی برعکس بودند (۱۲۳→۳۲۱) → bidi ردیف‌های LTR؛ alias آ/أ/ي/ك/٪/—/→ و گلیف ( ) = ·؛ ۳ شبیه «؟» بود → سه‌قوسی · بیلد+بوت jsdom صفر خطا · شفافیت: صفر پیکسل alpha=0 در مزرعه و ۵ طبقه‌ی دانجن
 - ن۴۷: ۶ فیکس — تاج نخبه MHEAD per-kind (۱۴ جور کالیبره از رندر واقعی) + تاج بعد از اسپرایت (خز وسطش را می‌خورد) + اسپلش زیر موجودیت‌ها + صدای shoot/fire + chill ریست + monster_registry (همه ≤۲۸۰ خط) · wire سخت‌گیر BASE∪entry 108/108 (۲ صدا import می‌شدند ولی باندل نبودند!) · qa_all 52 · elite47 4/4 · stage47_elites.gif+montage
 - ن۴۶: پاکسازی ۲۰MB→۴٫۹MB؛ ن۴۷ پالایش به سیاست «فقط فایل جاری» → ۲٫۵MB
+- ن۵۳ 🎨 **فاز ۳ پروژه‌ی HD-2D — هنر اسپرایت**: رمپ ۵پله‌ی هیو-شیفت در `FS_SPR` (کوانتیزه‌ی نور + سایه‌ی سرد/هایلایت گرم، هیوی نور حفظ) · نور لبه‌ی جهت‌دار (`u_rim` + `fwidth(v_r01)` + ۳ نمونه‌ی آلفا؛ مزرعه=خورشید، دانجن=`rimRun` مرکز جرم نورها) · **sel-out** در `raster.outline` (میانگین ۸همسایه، سقف روشنایی ۵۸ — هم CPU هم GPU) · سوییچ QA `?noramp=1` و `__glStat(0/1)` · **سنجه‌ی A/B**: ۳٫۹٪ پیکسل با میانگین |ΔL|=۲۱ · دامنه‌ی هیو ۲۹٫۵→۳۹٫۱ (+۳۳٪) · سطوح روشنایی ۳۸→۱۷ (−۵۵٪) · pool شب ۱٫۱۱→۱٫۵۷ · بنچ GL ≤۲٫۱۸ms (نبرد، SwiftShader) · boot/smoke/jsdom/p2chk همه PASS · **نمره ۲۵/۷۰→۲۹/۷۰** · شیت `shots/p3_sheet.png` · جزئیات `PHASE3.md`
 - ن۵۲ 💡 **فاز ۲ پروژه‌ی HD-2D — نورپردازی**: `cycle()` خورشید/ماه + تینت رنگی محیط · نور نقطه‌ای رنگی با N·L و افت شعاعی (≤۲۴: قهرمان/مشعل فلیکر/محراب پالس/پله/essence/پنجره) · کارت نور (lightmap رویه‌ای mode 3) برای حوضه‌ی گرم/سرد · AO تماس + سایه‌ی جهت‌دار از خورشید · emissive (پنجره‌ی خانه/شعله/نخبه) · تینت شب آبی‌فام عمیق + وینیت دانجن ۱٫۳۵ · **راستی‌آزمایی**: نسبت شب/روز ۰٫۵۹→۰٫۳۴ · dark% دانجن ۵٫۰→۳۳٫۰ · pool نبرد ۲٫۲۶→۳٫۴۹ · flat16 ۰٫۹۱→۰٫۷۷ · بنچ ≤۱٫۴۴ms (SwiftShader) · boot1/smoke1/CPU-gltest/jsdom همه PASS · ۵ باگ مسیر (تخصیص ایمن `DEC[dn]`، نگهبان حلقه، نرمال ۲px، کارت نور، exportهای گم‌شده) · **نمره ۱۷/۷۰→۲۵/۷۰** · شیت `shots/p2_sheet.png` · جزئیات `PHASE2.md` · فایل‌ها همه ≤۲۸۰ خط
 - ن۴۵: ۱۱ کلید i18n مرده + maxHp ابزارها→run.maxHp · فازر ۴۰سیید×۲۴طبقه صفر کرش · مرورگر ۴ سیید پاک
 - ن۴۴: ۷ موب متمایز (mummy/archer/ram/yeti/imp/bandit/hare) + پرتابه‌ها + اسپاون امضایی nsig
@@ -160,6 +161,7 @@ node /tmp/realtest/boot42.mjs     # ۱۰ بوت jsdom (نصب: npm i jsdom canva
 node tools/bench.mjs              # فقط میانه‌ی هم‌پروسه
 node tools/audit0.mjs && python3 tools/analyze0.py   # فاز ۰: Playwright سه‌نما + شیت/سنجه (نیازمند نصب مجدد محیط)
 ```
+- **درس فاز ۳**: (ن۵۴) `fwidth(v_r01)` اندازه‌ی پیکسلِ همان اسپرایت را می‌دهد → نور لبه بدون دانستن ابعاد اسپرایت · `raster.outline` یک چوک‌پوینت مشترک است → sel-out یک‌جا CPU+GPU را می‌گیرد · برای A/B واقعی صحنه باید ثابت باشد (چیدمان دانجن هر اجرا تصادفی است) وگرنه تفاوت انیمیشن را به‌جای افکت می‌سنجی · ابزار شیت: `tools/phase3_sheet.py` (قبل/بعد + ردیف A/B)
 - **درس فاز ۲**: (ن۵۳) نور روی سطح تخت با N·L حوضه نمی‌سازد → کارت نور (lightmap) لازم است · `DEC[dn] || (DEC[dn] = {})` الگوی ایمن هر صف شیئی است (بی‌آن، حلقه‌ی رندر می‌مرد و اعداد تست دروغ می‌شوند) · خطای یک فریم GPU → افت به CPU، هرگز قفل · نرمال از گرادیان ۱px خرد می‌شود (گام ۲px + clamp ±۰٫۲۲ + relief ۷) · `u_light` را فقط برنامه‌ی زمین دارد و `highp` باید دو طرف یکی باشد · بعد از هر بازنویسی شیدر، VS_OVL/FS_OVL/VS_LAY را دوباره export کن
 - بعد از هر ماژول جدید: چک wire «BASE∪entry» (الگوی ن۴۷) + بوت jsdom
 - بعد از هر تغییر dungeon/blueprint: ممیزی دسترس‌پذیری (flood-fill + A* از اسپاون به صندوق/محراب/پله، ۲۰۰ سیید)
