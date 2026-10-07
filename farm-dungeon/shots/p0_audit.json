@@ -7,17 +7,17 @@
   "scale": 1,
   "colors_exact": 155,
   "colors_q4": 155,
-  "meanL": 97.9,
-  "stdL": 34.8,
+  "meanL": 99.5,
+  "stdL": 30.2,
   "dark%": 8.4,
   "bright%": 0.0,
   "bloom%": 0.0,
-  "sat": 110.5,
-  "hue_dom%": 76.5,
+  "sat": 121.6,
+  "hue_dom%": 69.5,
   "edge_bands": [
-   9.57,
+   9.4,
    3.21,
-   11.56
+   11.38
   ],
   "tile_flat": 0.8,
   "detail%/tile": 20.0,
@@ -40,17 +40,17 @@
   "scale": 1,
   "colors_exact": 160,
   "colors_q4": 153,
-  "meanL": 56.6,
-  "stdL": 20.1,
+  "meanL": 58.3,
+  "stdL": 15.7,
   "dark%": 16.0,
   "bright%": 0.0,
   "bloom%": 0.0,
-  "sat": 122.8,
-  "hue_dom%": 85.4,
+  "sat": 133.9,
+  "hue_dom%": 78.3,
   "edge_bands": [
-   5.97,
+   5.8,
    1.67,
-   6.5
+   6.33
   ],
   "tile_flat": 0.851,
   "detail%/tile": 14.9,
@@ -72,18 +72,18 @@
   ],
   "scale": 1,
   "colors_exact": 185,
-  "colors_q4": 181,
-  "meanL": 84.1,
-  "stdL": 29.9,
+  "colors_q4": 182,
+  "meanL": 85.8,
+  "stdL": 25.3,
   "dark%": 8.4,
   "bright%": 0.0,
   "bloom%": 0.0,
-  "sat": 113.8,
-  "hue_dom%": 90.3,
+  "sat": 124.9,
+  "hue_dom%": 82.3,
   "edge_bands": [
-   8.95,
+   8.75,
    2.53,
-   9.63
+   9.46
   ],
   "tile_flat": 0.85,
   "detail%/tile": 15.0,
@@ -94,7 +94,7 @@
   },
   "ground_period_px": 16,
   "aa": {
-   "soft%": 0.81,
+   "soft%": 0.82,
    "hard%": 11.22
   }
  },
@@ -106,17 +106,17 @@
   "scale": 1,
   "colors_exact": 164,
   "colors_q4": 159,
-  "meanL": 61.5,
-  "stdL": 21.9,
+  "meanL": 63.2,
+  "stdL": 17.4,
   "dark%": 15.4,
   "bright%": 0.0,
   "bloom%": 0.0,
-  "sat": 121.4,
-  "hue_dom%": 85.1,
+  "sat": 132.5,
+  "hue_dom%": 77.9,
   "edge_bands": [
-   6.46,
+   6.29,
    1.79,
-   6.99
+   6.81
   ],
   "tile_flat": 0.851,
   "detail%/tile": 14.9,
@@ -138,18 +138,18 @@
   ],
   "scale": 1,
   "colors_exact": 794,
-  "colors_q4": 297,
-  "meanL": 52.3,
-  "stdL": 19.9,
+  "colors_q4": 296,
+  "meanL": 52.6,
+  "stdL": 19.3,
   "dark%": 15.1,
   "bright%": 0.0,
   "bloom%": 0.0,
-  "sat": 73.8,
-  "hue_dom%": 97.3,
+  "sat": 73.1,
+  "hue_dom%": 97.2,
   "edge_bands": [
    15.04,
    9.48,
-   8.91
+   8.88
   ],
   "tile_flat": 0.551,
   "detail%/tile": 44.9,
@@ -171,18 +171,18 @@
   ],
   "scale": 1,
   "colors_exact": 847,
-  "colors_q4": 299,
-  "meanL": 52.7,
-  "stdL": 20.2,
+  "colors_q4": 298,
+  "meanL": 53.0,
+  "stdL": 19.6,
   "dark%": 14.9,
   "bright%": 0.0,
   "bloom%": 0.0,
-  "sat": 73.1,
+  "sat": 72.4,
   "hue_dom%": 98.1,
   "edge_bands": [
    15.71,
    9.27,
-   8.91
+   8.88
   ],
   "tile_flat": 0.548,
   "detail%/tile": 45.2,
@@ -203,22 +203,22 @@
    351
   ],
   "scale": 1,
-  "colors_exact": 1221,
-  "colors_q4": 490,
-  "meanL": 59.4,
-  "stdL": 28.7,
+  "colors_exact": 1208,
+  "colors_q4": 487,
+  "meanL": 59.7,
+  "stdL": 28.2,
   "dark%": 22.2,
   "bright%": 0.1,
   "bloom%": 0.0,
-  "sat": 47.6,
-  "hue_dom%": 29.5,
+  "sat": 46.9,
+  "hue_dom%": 29.0,
   "edge_bands": [
    14.33,
    16.89,
-   20.01
+   19.97
   ],
-  "tile_flat": 0.532,
-  "detail%/tile": 46.8,
+  "tile_flat": 0.525,
+  "detail%/tile": 47.5,
   "sprite": {
    "bgL": 91.0,
    "sprL": 185.0,
@@ -226,7 +226,7 @@
   },
   "ground_period_px": 16,
   "aa": {
-   "soft%": 9.69,
+   "soft%": 9.65,
    "hard%": 20.46
   }
  }

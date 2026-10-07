@@ -68,7 +68,9 @@ def aa_share(a):
 AUD = {}
 for name, s in M['shots'].items():
     p = os.path.join(ROOT, s['raw']['file'])
-    im = Image.open(p).convert('RGB'); st = s['state']
+    im = Image.open(p).convert('RGBA'); st = s['state']
+    # شفاف = باندِ letterbox (دنیای مزرعه ۴۸۰×۳۲۰ < نما ۱۹۵×۳۴۹) → روی رنگ پس‌زمینه‌ی بازی تخت می‌شود
+    bgc = Image.new('RGBA', im.size, (20, 17, 36, 255)); bgc.alpha_composite(im); im = bgc.convert('RGB')
     sc = 1  # p0_raw_* = رستر صحنه (قبلاً dump بوم بود و /scale می‌شد)
     im2 = im.resize((im.width // sc, im.height // sc), Image.NEAREST)   # رستر پیکسل‌دقیق
     vh = st['view']['h'] if name.startswith('farm') or name.startswith('dungeon') or name.startswith('battle') or name.startswith('boss') else im2.height
@@ -137,8 +139,7 @@ sheet = Image.new('RGB', (W, H), (14, 12, 22)); dr = ImageDraw.Draw(sheet)
 f1 = ImageFont.truetype(FONT_B, 26); f2 = ImageFont.truetype(FONT_B, 15); f3 = ImageFont.truetype(FONT_M, 13); f4 = ImageFont.truetype(FONT_B, 14)
 
 dr.text((GAP, 16), 'FARM & DUNGEON  -  PHASE 0 BASELINE  (CPU 2D renderer, no GPU pipeline yet)', font=f1, fill=(242, 202, 92))
-dr.text((GAP, 52), 'every panel = real gameplay frame from headless Chromium + SwiftShader WebGL2  ·  scene raster %dx%d scaled x%d nearest' % (
-    AUD['farm_day']['size'][0], AUD['farm_day']['size'][1], Z), font=f3, fill=(168, 162, 190))
+dr.text((GAP, 52), 'real gameplay frames from headless Chromium + SwiftShader WebGL2  ·  farm world is 480x320 while the portrait view is 195x349 -> letterbox band (see finding list) is flattened to the game background  ·  x%d nearest' % Z, font=f3, fill=(168, 162, 190))
 
 y0 = HEAD
 for i, (lab, im, bk, key) in enumerate(panels):
