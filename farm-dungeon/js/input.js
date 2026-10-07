@@ -62,6 +62,7 @@ export class Input {
     const kx = this.canvas.width / r.width, ky = this.canvas.height / r.height; // CSS → device pixel
     const cx = (e.clientX - r.left) * kx, cy = (e.clientY - r.top) * ky;
     const s = this.canvas._cam; // {scale, camX, camY} که main ست می‌کند
+    if (s.inv) return s.inv(cx / s.scale, cy / s.scale); // مسیر GPU: دوربین پرسپکتیو → معکوس دقیق
     return { worldX: cx / s.scale + s.camX, worldY: cy / s.scale + s.camY };
   }
   // بردار حرکت خواسته‌شده + پرچم دویدن

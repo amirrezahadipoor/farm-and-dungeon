@@ -454,6 +454,395 @@ function rot(x, y, ang) {
 return {Raster, rasterToCanvas, rot};
 })();
 const {Raster, rasterToCanvas, rot} = __m_raster;
+const __m_art_gl = (() => {
+// art/gl.js — هسته‌ی رندر GPU (فاز ۱ HD-2D): کانتکست WebGL2، شیدر زمین/اسپرایت/اورلی و بوت.
+// باتچر/اطلس/مش در art/gl_batch.js. مسیر CPU دست‌نخورده = fallback کامل (jsdom/بدون WebGL2).
+const GLR = { ok: false, gl: null, w: 0, h: 0, vp: new Float32Array([2, 2]), uscale: 1, flash: 0, quads: 0, draws: 0, lost: false, restores: 0 };
+const MAXL = 24, MAXQ = 1400, VERT = 11;
+const GLT = { ground: 0, atlas: 0, cw: 512, ch: 384, lights: new Float32Array(MAXL * 4), n: 0, dark: new Float32Array([13 / 255, 11 / 255, 26 / 255]) };
+
+const COMMON = `
+uniform vec4 u_light[${MAXL}];
+uniform int u_nl;
+uniform vec3 u_dark;
+uniform vec4 u_tint;
+uniform float u_flash;
+vec3 lightAt(vec2 p) {
+  float a = u_tint.a;
+  for (int i = 0; i < ${MAXL}; i++) {
+    if (i >= u_nl) break;
+    vec4 L = u_light[i];
+    float dx = p.x - L.x, dy = p.y - L.y;
+    float k = 1.0 - (dx * dx + dy * dy) / (L.z * L.z);
+    if (k > 0.0) a -= L.w * k;
+  }
+  if (a < 0.0) a = 0.0;
+  return mix(u_tint.rgb, u_dark, a / 255.0);
+}`;
+const PROJ = `
+uniform vec2 u_cam, u_view, u_ax, u_vp;
+uniform float u_persp, u_scale;
+vec2 projW(vec2 w, out float kz) {
+  vec2 d = w - u_cam;
+  kz = 1.0 / (1.0 - d.y * u_persp);
+  vec2 s = u_view * 0.5 + vec2(d.x * u_ax.x, d.y * u_ax.y) * kz;
+  return floor(s + 0.5);
+}
+vec4 toClip(vec2 p) {
+  return vec4(p.x * u_scale / u_vp.x * 2.0 - 1.0, 1.0 - p.y * u_scale / u_vp.y * 2.0, 0.0, 1.0);
+}`;
+const VS_GND = `#version 300 es
+layout(location = 0) in vec2 a_world;
+uniform vec2 u_org, u_tsize, u_ts;
+out vec2 v_uv, v_sc;
+${PROJ}
+void main() {
+  float kz;
+  vec2 p = projW(a_world, kz);
+  v_sc = p;
+  v_uv = clamp((a_world - u_org) / u_tsize, vec2(0.0), vec2(1.0)) * (u_tsize / u_ts);
+  gl_Position = toClip(p);
+}`;
+const FS_GND = `#version 300 es
+precision mediump float;
+uniform sampler2D u_tex;
+in vec2 v_uv, v_sc;
+out vec4 o;
+${COMMON}
+void main() {
+  vec4 c = texture(u_tex, v_uv);
+  if (c.a < 0.004) discard;
+  o = vec4(mix(c.rgb * lightAt(v_sc), vec3(1.0), u_flash), c.a);
+}`;
+const VS_SPR = `#version 300 es
+layout(location = 0) in vec2 a_pos;
+layout(location = 1) in vec2 a_rel;
+layout(location = 2) in vec2 a_uv;
+layout(location = 3) in vec4 a_col;
+layout(location = 4) in float a_mode;
+out vec2 v_uv, v_sc;
+out vec4 v_col;
+flat out float v_mode;
+${PROJ}
+void main() {
+  float kz;
+  vec2 p = projW(a_pos, kz);
+  if (a_mode > 0.5) { p = a_pos; kz = 1.0; }
+  v_sc = p;
+  v_uv = a_uv;
+  v_col = a_col;
+  v_mode = a_mode;
+  vec2 rel = a_rel * u_ax.y; // اسپرایت با مقیاس یکنواخت (upright) — بدون کشیدگی افقی زمینِ شیب‌دار
+  gl_Position = toClip(floor(p + rel * kz + 0.5));
+}`;
+const FS_SPR = `#version 300 es
+precision mediump float;
+uniform sampler2D u_tex;
+in vec2 v_uv, v_sc;
+in vec4 v_col;
+flat in float v_mode;
+out vec4 o;
+${COMMON}
+void main() {
+  vec4 c = texture(u_tex, v_uv) * v_col;
+  if (c.a < 0.004) discard;
+  vec3 lc = mix(c.rgb * lightAt(v_sc), c.rgb, step(0.5, v_mode));
+  o = vec4(mix(lc, vec3(1.0), u_flash), c.a);
+}`;
+const VS_OVL = `#version 300 es
+layout(location = 0) in vec2 a_p;
+out vec2 v_uv;
+void main() { v_uv = a_p; gl_Position = vec4(a_p * 2.0 - 1.0, 0.0, 1.0); }`;
+const FS_OVL = `#version 300 es
+precision mediump float;
+uniform float u_fade, u_vig;
+uniform vec3 u_fill;
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec2 q = v_uv * 2.0 - 1.0;
+  float a = 1.0 - u_fade;
+  float v = smoothstep(0.70, 1.40, length(q)) * u_vig * 0.55;
+  if (v > a) a = v;
+  o = vec4(u_fill, a);
+}`;
+
+function mkShader(gl, type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error('GLSL: ' + gl.getShaderInfoLog(s)); return null; }
+  return s;
+}
+function mkProg(gl, vs, fs) {
+  const a = mkShader(gl, gl.VERTEX_SHADER, vs), b = mkShader(gl, gl.FRAGMENT_SHADER, fs);
+  if (!a || !b) return null;
+  const p = gl.createProgram();
+  gl.attachShader(p, a); gl.attachShader(p, b); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.error('LINK: ' + gl.getProgramInfoLog(p)); return null; }
+  gl.deleteShader(a); gl.deleteShader(b);
+  return { p, c: new Map() };
+}
+function uni(pr, n) {
+  let l = pr.c.get(n);
+  if (l === undefined) {
+    l = GLR.gl.getUniformLocation(pr.p, n);
+    if (l === null) console.warn('uniform missing: ' + n);
+    pr.c.set(n, l);
+  }
+  return l;
+}
+function mkTex(gl, w, h) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+
+// لایه‌های صفحه‌ای (افکت‌ها/آب‌وهوا): کوآد واحد با تکسچر خودشان
+const VS_LAY = `#version 300 es
+layout(location = 0) in vec2 a_p;
+uniform vec2 u_size, u_vp, u_uv;
+uniform float u_scale;
+out vec2 v_uv;
+void main() {
+  v_uv = a_p * u_uv;
+  vec2 px = a_p * u_size;
+  gl_Position = vec4(px.x * u_scale / u_vp.x * 2.0 - 1.0, 1.0 - px.y * u_scale / u_vp.y * 2.0, 0.0, 1.0);
+}`;
+const FS_LAY = `#version 300 es
+precision mediump float;
+uniform sampler2D u_tex;
+in vec2 v_uv;
+out vec4 o;
+void main() { o = texture(u_tex, v_uv); }`;
+
+function glInit(canvas) {
+  let gl = null;
+  try {
+    gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+  } catch (e) { gl = null; }
+  if (!gl || typeof gl.createVertexArray !== 'function') return false;
+  GLR.gl = gl;
+  const g = mkProg(gl, VS_GND, FS_GND), s = mkProg(gl, VS_SPR, FS_SPR), o = mkProg(gl, VS_OVL, FS_OVL);
+  if (!g || !s || !o) return false;
+  GLR.progs = { g, s, o };
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.clearColor(0.078, 0.067, 0.141, 1);
+  glBatchInit();
+  GLR.ok = true; GLR.lost = false;
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); GLR.ok = false; GLR.lost = true; });
+  canvas.onwebglcontextrestored = () => { GLR.restores++; GLR.ok2 = glInit(canvas); }; // همان context برمی‌گردد → منابع از نو
+  return true;
+}
+function glResize(w, h) {
+  const gl = GLR.gl;
+  gl.viewport(0, 0, w, h);
+  GLR.w = w; GLR.h = h; GLR.vp[0] = w; GLR.vp[1] = h;
+}
+function glReadback() {
+  const gl = GLR.gl, w = gl.canvas.width, h = gl.canvas.height;
+  const px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) out.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+  return { w, h, d: out };
+}
+
+return {GLR, MAXL, MAXQ, VERT, GLT, VS_LAY, FS_LAY, mkProg, uni, mkTex, glInit, glResize, glReadback};
+})();
+const {GLR, MAXL, MAXQ, VERT, GLT, VS_LAY, FS_LAY, mkProg, uni, mkTex, glInit, glResize, glReadback} = __m_art_gl;
+const __m_art_gl_batch = (() => {
+// art/gl_batch.js — منابع و batcher مسیر GPU: اطلس ۲۰۴۸² (shelf packing)، تکسچر زمین پویا،
+// مش زمین شیب‌دار (۱۶px و ۳۲px برای دو سطح کیفیت)، صف اسپرایت (۴رأس/۶اندیس)، نور و اورلی.
+
+
+const GLAT = { size: 2048, map: new Map(), x: 1, y: 1, shelfH: 0 };
+const SB = { n: 0, data: null, vao: null, vbo: null, quad: null };
+const GND = { m16: null, m32: null };
+const LAY = { pr: null };
+const _p = { cam: null, ax: null, persp: 0, view: null, tint: null };
+
+function mesh(gl, step) {
+  const C = (480 / step) | 0, R = (320 / step) | 0, v = [], idx = [];
+  for (let y = 0; y <= R; y++) for (let x = 0; x <= C; x++) v.push(x * step, y * step);
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+    const a = y * (C + 1) + x;
+    idx.push(a, a + 1, a + C + 2, a, a + C + 2, a + C + 1);
+  }
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { vao, n: idx.length };
+}
+
+function glBatchInit() {
+  const gl = GLR.gl;
+  GLAT.map.clear(); GLAT.x = 1; GLAT.y = 1; GLAT.shelfH = 0; // رکوردهای UV باطل می‌شوند → بازپخت خودکار
+  GLT.atlas = mkTex(gl, GLAT.size, GLAT.size);
+  GLT.ground = mkTex(gl, GLT.cw, GLT.ch);
+  GLT.ui = mkTex(gl, GLT.cw, GLT.ch);
+  GLT.wx = mkTex(gl, GLT.cw, GLT.ch);
+  LAY.pr = mkProg(gl, VS_LAY, FS_LAY);
+  GND.m16 = mesh(gl, 16); GND.m32 = mesh(gl, 32);
+  SB.data = new Float32Array(MAXQ * 4 * VERT);
+  SB.vao = gl.createVertexArray();
+  gl.bindVertexArray(SB.vao);
+  SB.vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, SB.vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, SB.data.byteLength, gl.DYNAMIC_DRAW);
+  const st = VERT * 4;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, st, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, st, 8);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, st, 16);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.FLOAT, false, st, 24);
+  gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 1, gl.FLOAT, false, st, 40);
+  const idx = new Uint16Array(MAXQ * 6);
+  for (let i = 0; i < MAXQ; i++) { const b = i * 4, q = i * 6; idx[q] = b; idx[q + 1] = b + 1; idx[q + 2] = b + 2; idx[q + 3] = b; idx[q + 4] = b + 2; idx[q + 5] = b + 3; }
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  SB.quad = gl.createVertexArray(); // کوآد واحد ۰..۱ (اورلی + لایه‌ها)
+  gl.bindVertexArray(SB.quad);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+  gl.bindVertexArray(null);
+}
+// تکسچر لایه‌ها: افکت‌ها (مقیاس‌شده) و آب‌وهوا (۱:۱)
+function glUi(ras, w, h) {
+  const gl = GLR.gl;
+  gl.bindTexture(gl.TEXTURE_2D, GLT.ui);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, ras.d.subarray(0, w * h * 4));
+}
+function glWx(ras, w, h) {
+  const gl = GLR.gl;
+  gl.bindTexture(gl.TEXTURE_2D, GLT.wx);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, ras.d.subarray(0, w * h * 4));
+}
+function glLayer(which, w, h, uw, uh) {
+  const gl = GLR.gl, pr = LAY.pr;
+  if (!pr) return;
+  gl.useProgram(pr.p);
+  gl.uniform2f(uni(pr, 'u_size'), w, h);
+  gl.uniform2f(uni(pr, 'u_uv'), uw, uh);
+  gl.uniform2fv(uni(pr, 'u_vp'), GLR.vp);
+  gl.uniform1f(uni(pr, 'u_scale'), GLR.uscale);
+  gl.uniform1i(uni(pr, 'u_tex'), 0);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, which === 0 ? GLT.ui : GLT.wx);
+  gl.bindVertexArray(SB.quad);
+  gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+  gl.bindVertexArray(null);
+  GLR.draws++;
+}
+
+// ---- اطلس: کلید یکتا → رکورد UV؛ سرریز = بازچینی از ابتدا (اسپرایت‌ها دوباره آپلود می‌شوند) ----
+function glAtlas(key, ras) {
+  let rec = GLAT.map.get(key);
+  if (rec) return rec;
+  const gl = GLR.gl, pad = 1, w = ras.w + pad * 2, h = ras.h + pad * 2;
+  if (GLAT.x + w > GLAT.size) { GLAT.x = 1; GLAT.y += GLAT.shelfH + 1; GLAT.shelfH = 0; }
+  if (GLAT.y + h > GLAT.size) { GLAT.map.clear(); GLAT.x = 1; GLAT.y = 1; GLAT.shelfH = 0; }
+  const x = GLAT.x, y = GLAT.y;
+  gl.bindTexture(gl.TEXTURE_2D, GLT.atlas);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, x + pad, y + pad, ras.w, ras.h, gl.RGBA, gl.UNSIGNED_BYTE, ras.d);
+  GLAT.x += w; if (h > GLAT.shelfH) GLAT.shelfH = h;
+  rec = { u0: (x + pad + 0.02) / GLAT.size, v0: (y + pad + 0.02) / GLAT.size, u1: (x + pad + ras.w - 0.02) / GLAT.size, v1: (y + pad + ras.h - 0.02) / GLAT.size, w: ras.w, h: ras.h };
+  GLAT.map.set(key, rec);
+  return rec;
+}
+function glGround(ras, w, h) {
+  const gl = GLR.gl;
+  gl.bindTexture(gl.TEXTURE_2D, GLT.ground);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, ras.d.subarray(0, w * h * 4));
+}
+function glPush(rec, ax, ay, ox, oy, c, mode = 0) {
+  if (SB.n >= MAXQ) glFlushSprites();
+  const d = SB.data; let o = SB.n * 4 * VERT;
+  const xs = [-ox, rec.w - ox, rec.w - ox, -ox], ys = [-oy, -oy, rec.h - oy, rec.h - oy];
+  const us = [rec.u0, rec.u1, rec.u1, rec.u0], vs = [rec.v0, rec.v0, rec.v1, rec.v1];
+  for (let i = 0; i < 4; i++) {
+    d[o++] = ax; d[o++] = ay; d[o++] = xs[i]; d[o++] = ys[i]; d[o++] = us[i]; d[o++] = vs[i];
+    d[o++] = c[0]; d[o++] = c[1]; d[o++] = c[2]; d[o++] = c[3]; d[o++] = mode;
+  }
+  SB.n++;
+}
+function glCam(cam, ax, persp, view, tint) { _p.cam = cam; _p.ax = ax; _p.persp = persp; _p.view = view; _p.tint = tint; }
+function glLights(list, n) { GLT.n = n; if (n) GLT.lights.set(list.subarray(0, n * 4)); }
+function bindCam(gl, pr) {
+  gl.uniform2fv(uni(pr, 'u_cam'), _p.cam);
+  gl.uniform2fv(uni(pr, 'u_view'), _p.view);
+  gl.uniform2fv(uni(pr, 'u_ax'), _p.ax);
+  gl.uniform2fv(uni(pr, 'u_vp'), GLR.vp);
+  gl.uniform1f(uni(pr, 'u_persp'), _p.persp);
+  gl.uniform1f(uni(pr, 'u_scale'), GLR.uscale);
+  gl.uniform1f(uni(pr, 'u_flash'), GLR.flash);
+  gl.uniform3fv(uni(pr, 'u_dark'), GLT.dark);
+  gl.uniform4fv(uni(pr, 'u_tint'), _p.tint);
+  gl.uniform4fv(uni(pr, 'u_light[0]'), GLT.lights);
+  gl.uniform1i(uni(pr, 'u_nl'), GLT.n);
+  gl.uniform1i(uni(pr, 'u_tex'), 0);
+}
+function glFrame(cam, ax, persp, view, tint, org, tsize, step) {
+  const gl = GLR.gl;
+  glCam(cam, ax, persp, view, tint);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  GLR.draws = 0; GLR.quads = 0;
+  const pr = GLR.progs.g, m = step === 32 ? GND.m32 : GND.m16;
+  gl.useProgram(pr.p);
+  bindCam(gl, pr);
+  gl.uniform2fv(uni(pr, 'u_org'), org);
+  gl.uniform2fv(uni(pr, 'u_tsize'), tsize);
+  gl.uniform2f(uni(pr, 'u_ts'), GLT.cw, GLT.ch);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, GLT.ground);
+  gl.bindVertexArray(m.vao);
+  gl.drawElements(gl.TRIANGLES, m.n, gl.UNSIGNED_SHORT, 0);
+  GLR.draws++;
+  gl.bindVertexArray(null);
+}
+function glFlushSprites() {
+  if (!SB.n) return;
+  const gl = GLR.gl, pr = GLR.progs.s;
+  gl.useProgram(pr.p);
+  bindCam(gl, pr);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, GLT.atlas);
+  gl.bindVertexArray(SB.vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, SB.vbo);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, SB.data.subarray(0, SB.n * 4 * VERT));
+  gl.drawElements(gl.TRIANGLES, SB.n * 6, gl.UNSIGNED_SHORT, 0);
+  gl.bindVertexArray(null);
+  GLR.draws++; GLR.quads += SB.n; SB.n = 0;
+}
+function glOverlay(fade, vig) {
+  const gl = GLR.gl, pr = GLR.progs.o;
+  gl.useProgram(pr.p);
+  gl.uniform1f(uni(pr, 'u_fade'), fade);
+  gl.uniform1f(uni(pr, 'u_vig'), vig);
+  gl.uniform3f(uni(pr, 'u_fill'), 0.039, 0.031, 0.094);
+  gl.bindVertexArray(SB.quad);
+  gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+  gl.bindVertexArray(null);
+}
+
+return {GLAT, glBatchInit, glUi, glWx, glLayer, glAtlas, glGround, glPush, glCam, glLights, glFrame, glFlushSprites, glOverlay};
+})();
+const {GLAT, glBatchInit, glUi, glWx, glLayer, glAtlas, glGround, glPush, glCam, glLights, glFrame, glFlushSprites, glOverlay} = __m_art_gl_batch;
 const __m_art_palette_hero = (() => {
 // art/palette_hero.js — پالت ثابت ۲۴ رنگه‌ی قهرمان/کارگر (از ریشه به art/ منتقل شد) (بدون هیچ رنگ محاسبه‌شده‌ی خارج از پالت)
 const PAL = {
@@ -2379,6 +2768,7 @@ function farmHeroSprite(game) {
 
 // رندر کامل صحنه‌ی مزرعه در Raster
 function renderFarm(game, r) {
+    const flat = !!r.flatOnly; // فاز ۱ HD-2D: فریم زمین برای مسیر GPU — فقط لایه‌ی زمین/دکورِ سطحی
     const cx = Math.round(clamp(game.cam.x, Math.min(0, (WORLD_W - r.w) / 2), Math.max(0, WORLD_W - r.w)));
     const cy = Math.round(clamp(game.cam.y, Math.min(0, (WORLD_H - r.h) / 2), Math.max(0, WORLD_H - r.h)));
     const f = game.farm, wf = [0, 1, 2, 1][Math.floor(game.time * 0.9) % 4]; // موج آب: سیکل آرام ~۱٫۱ث/فریم (ن۳۷)
@@ -2418,16 +2808,16 @@ function renderFarm(game, r) {
         if (below && below.farmable && below.kind === 'grass') groundSprite('bush').over(r, sx, sy);
       }
       // ---- دکور زنده‌ی مزرعه (آرت جدا در js/art/) ----
-      if (c.kind === 'sign') drawSaleSign(r, sx, sy, game.time);
-      else if (c.kind === 'scarecrow') drawScarecrow(r, sx, sy, game.time); // نگهبان پرنده‌ها
+      if (!flat && c.kind === 'sign') drawSaleSign(r, sx, sy, game.time); // مسیر GPU: billboard جدا
+      else if (!flat && c.kind === 'scarecrow') drawScarecrow(r, sx, sy, game.time); // نگهبان پرنده‌ها
       else if (c.kind === 'grass' && !f.insideFence(tx, ty)) drawMeadow(r, sx, sy, tx, ty, game.time, c.db); // db = نزدیکی مسیر/آب → گل بیشتر
-      if (tx === 26 && ty === 14 && game.toolLvls.sprinkler) drawSprinkler(r, sx, sy, game.time); // آبپاش: بالای حوضچه، از آن آب می‌کشد
-      if (tx === 18 && ty === 16 && game.toolLvls.basket) drawBasketCrate(r, sx, sy, game.time); // سبد: کنار خانه
+      if (!flat && tx === 26 && ty === 14 && game.toolLvls.sprinkler) drawSprinkler(r, sx, sy, game.time); // آبپاش: بالای حوضچه، از آن آب می‌کشد
+      if (!flat && tx === 18 && ty === 16 && game.toolLvls.basket) drawBasketCrate(r, sx, sy, game.time); // سبد: کنار خانه
       else if (c.kind === 'water') drawWaterLife(r, sx, sy, tx, ty, game.time);
       if (c.crop && f.mature(c)) drawReadySparkle(r, sx, sy, tx, ty, game.time, !!c.crop.g);
     }
-    // نشانگر هدف (گوشه‌های چشمک‌زن)
-    if (game.marker) {
+    // نشانگر هدف (گوشه‌های چشمک‌زن) — در مسیر GPU به‌صورت billboard جدا رسم می‌شود
+    if (!flat && game.marker) {
       const m = game.marker, sx = m.x * TILE - cx, sy = m.y * TILE - cy;
       const col = Math.floor(m.t * 2) % 2 ? E.gold : E.white; // ن۳۷: چشمک نشانگر آرام‌تر (۲Hz)
       const c3 = 3;
@@ -2436,7 +2826,9 @@ function renderFarm(game, r) {
       r.rect(sx - 1, sy + TILE, c3 + 1, 1, col); r.rect(sx - 1, sy + TILE - c3, 1, c3, col);
       r.rect(sx + TILE - c3, sy + TILE, c3 + 1, 1, col); r.rect(sx + TILE - 1, sy + TILE - c3, 1, c3, col);
     }
+    if (flat) game.fish.draw(r, cx, cy, game.time, f); // ماهی روی صفحه‌ی زمین (زیر موجودات) — مسیر GPU
     // درخت‌ها + قهرمان + کارگر — مرتب بر اساس y (pool بازمصرف، صفر تخصیص)
+    if (!flat) {
     const h = game.hero;
     let fn = 0, tn = 0;
     for (let ty2 = y0; ty2 <= y1; ty2++) for (let tx2 = x0; tx2 <= x1; tx2++) {
@@ -2477,6 +2869,7 @@ function renderFarm(game, r) {
       drawPondRipples(r, game.time); // موج روی حوضچه
       const lk = lightningK(game.dayT, game.time); // رعد و برق — فقط باران
       if (lk > 0) { flashTint(r, lk); drawLightning(r, game.time); }
+    }
     }
   }
 
@@ -6621,6 +7014,7 @@ function blitRegion(dst, src, sx0, sy0, w, h) {
 
 // رندر کامل صحنه‌ی دانجن در Raster
 function renderRun(run, r) {
+    const flat = !!r.flatOnly; // فاز ۱ HD-2D: فریم زمین برای مسیر GPU — بدون تاریکی/موجودات/افکت‌ها
     const D = run.dungeon, h = run.hero;
     const [shx, shy] = run.fx.offset(run.time);
     let cx = clamp(Math.round(run.cam.x) + shx, 0, WORLD_W - r.w);
@@ -6648,6 +7042,7 @@ function renderRun(run, r) {
     drawTorches(r, D, cx, cy, run.time);
     drawChests(r, D, cx, cy, run.time);
     drawShrines(r, D, cx, cy, run.time);
+    if (flat) drawDrops(r, D, cx, cy); // قطره‌ها روی زمین (زیر موجودات) — در مسیر CPU بعد از موجودات بود
     // هاله‌ی تهدید باس (نبض قرمز زیر پا)
     const bossRef = D.enemies.find((e) => e.isBoss) || null; // یک find برای هاله + مینی‌مپ
     if (bossRef && bossRef.state !== 'die') r.ellipse(Math.round(bossRef.x) - cx, Math.round(bossRef.y) + 2 - cy, 26 + Math.round(Math.sin(run.time * 3) * 3), 8, [190, 60, 60, 42]);
@@ -6657,7 +7052,7 @@ function renderRun(run, r) {
       r.ellipse(Math.round(g.x) - cx, Math.round(g.y) - 14 - cy, 7 - g.t * 12, 12 - g.t * 20, [140, 220, 255, Math.max(0, a)]);
     }
     // ن۴۱: اسپلش ورود طبقه — فونت دوزبانه‌ی بزرگ، محو ۲٫۲ث (روی تاریکی می‌افتد تا خوانا بماند)
-    if (run._splash) {
+    if (!flat && run._splash) {
       const k = run.time - run._splash.t0;
       if (k < 0 || k > 2.2 || !isFinite(k)) run._splash = null;
       else {
@@ -6669,6 +7064,7 @@ function renderRun(run, r) {
         }
       }
     }
+    if (!flat) {
     // pool رپرها — بدون تخصیص آبجکت در هر فریم
     let ne = 0;
     for (const e of D.enemies) if (!e.dead) {
@@ -6706,8 +7102,10 @@ function renderRun(run, r) {
     drawDrops(r, D, cx, cy);
     if (run.hero.skillT > 0) r.ellipse(Math.round(h.x - cx), Math.round(h.y - 12 - cy), 40, 18, SKILL_HALO);
     if (run.hero.iframe > 0 && Math.floor(run.time * 16) % 2 === 0) r.ellipse(Math.round(h.x - cx), Math.round(h.y - 12 - cy), 14, 22, IFRAME_GLOW);
+    }
 
     // ---- تاریکی + منابع نور (آرت جدا در art/light.js) ----
+    if (!flat) {
     if (!run._dark || run._dark.w !== r.w || run._dark.h !== r.h) run._dark = new Raster(r.w, r.h);
     const L = _lights; L.length = 0;
     L.push(h.x - cx, h.y - 14 - cy, 78, 195); // دید باز — نه ذربین!
@@ -6767,6 +7165,7 @@ function renderRun(run, r) {
     const hx = Math.floor(h.x / TILE), hy = Math.floor(h.y / TILE);
     if (Math.floor(run.time * 4) % 2 === 0) r.rect(mx + hx * s, my + hy * s, 2, 2, [255, 255, 255, 255]);
     if (bossRef) r.px(mx + Math.floor(bossRef.x / TILE) * s, my + Math.floor(bossRef.y / TILE) * s, BOSS_DOT);
+    }
   }
 
 return {heroSprite, renderRun};
@@ -7417,6 +7816,7 @@ class Input {
     const kx = this.canvas.width / r.width, ky = this.canvas.height / r.height; // CSS → device pixel
     const cx = (e.clientX - r.left) * kx, cy = (e.clientY - r.top) * ky;
     const s = this.canvas._cam; // {scale, camX, camY} که main ست می‌کند
+    if (s.inv) return s.inv(cx / s.scale, cy / s.scale); // مسیر GPU: دوربین پرسپکتیو → معکوس دقیق
     return { worldX: cx / s.scale + s.camX, worldY: cy / s.scale + s.camY };
   }
   // بردار حرکت خواسته‌شده + پرچم دویدن
@@ -8098,6 +8498,315 @@ function initAppUI(env) {
 return {initAppUI};
 })();
 const {initAppUI} = __m_app_ui;
+const __m_art_glbake = (() => {
+// art/glbake.js — پخت رویه‌ای اسپرایت‌های مسیر GPU: اشیای عمودی مزرعه/دانجن، متن‌ها و مینی‌مپ یک‌بار
+// به اطلس می‌روند (فازِ نوسان کوانتیزه است تا تعداد bake ثابت بماند). کش = رستر؛ rec هر بار از glAtlas
+// خوانده می‌شود تا بعد از سرریز/بازچینی اطلس هم معتبر بماند.
+
+
+
+const BC = new Map();
+function glBakeCount() { return BC.size; }
+function bake(key, w, h, fn) {
+  let ras = BC.get(key);
+  if (!ras) { ras = new Raster(w, h); fn(ras); BC.set(key, ras); }
+  return glAtlas(key, ras);
+}
+
+const BK = {
+  tree: (v, sway) => bake('tv' + v + sway, 36, 40, (r) => drawTree(r, 8, 18, v, swing(v, sway), 0)),
+  // خانه: k = شب(۰/۱) + ۲×فازِ دود(۰..۲)
+  house: (k) => bake('hk' + k, 44, 48, (r) => drawFarmhouse(r, 4, 12, ((k >> 1) * 0.5) % 1.2, k & 1)),
+  glow: (ph) => bake('gw' + ph, 20, 32, (r) => drawFarmhouseGlow(r, 4, 2, ph * 0.4, 1)),
+  scare: (ph) => bake('sc' + ph, 20, 20, (r) => drawScarecrow(r, 2, 4, ph * 1.2)),
+  sign: () => bake('sg', 20, 20, (r) => drawSaleSign(r, 2, 4, 0)),
+  sprk: (ph) => bake('sp' + ph, 20, 20, (r) => drawSprinkler(r, 2, 2, ph * 0.85)),
+  crate: (ph) => bake('cr' + ph, 20, 20, (r) => drawBasketCrate(r, 2, 4, ph * 0.5)),
+  torch: (ph) => bake('to' + ph, 22, 26, (r) => drawTorches(r, { torches: [{ x: 4 / TILE, y: 8 / TILE }] }, 0, 0, ph * 0.16)),
+  shrine: (ph) => bake('sh' + ph, 22, 22, (r) => drawShrines(r, { shrine: { x: 11, y: 14, used: false } }, 0, 0, ph * 0.65)),
+  elite: (ph) => bake('el' + ph, 36, 12, (r) => drawEliteMark(r, 18, 6, ph * 0.4, -20)), // فقط هاله (تاج جدا)
+  crown: () => bake('cn', 8, 8, (r) => drawEliteMark(r, 4, 30, 0, 4)),
+  projArrow: (d) => bake('pa' + d, 20, 12, (r) => drawProjs(r, [{ kind: 'arrow', x: 10, y: 6, vx: COS[d], vy: SIN[d] }], 0, 0)),
+  projFire: (d) => bake('pf' + d, 20, 12, (r) => drawProjs(r, [{ kind: 'fire', x: 10, y: 6, vx: COS[d], vy: SIN[d] }], 0, 0)),
+  chill: () => bake('ch', 8, 6, (r) => {
+    r.px(0, 3, [170, 220, 250, 200]); r.px(8 - 4, 2, [190, 235, 255, 200]); r.px(4, 1, [150, 205, 245, 200]);
+  }),
+  corner: (ph) => bake('cg' + ph, 18, 18, (r) => {
+    const c = ph ? [230, 199, 74, 255] : [242, 239, 228, 255];
+    r.rect(0, 0, 4, 1, c); r.rect(0, 0, 1, 4, c); r.rect(17 - 3, 0, 4, 1, c); r.rect(17, 0, 1, 4, c);
+    r.rect(0, 17, 4, 1, c); r.rect(0, 17 - 3, 1, 4, c); r.rect(17 - 3, 17, 4, 1, c); r.rect(17, 17 - 3, 1, 4, c);
+  }),
+  white: () => bake('w1', 2, 2, (r) => r.rect(0, 0, 2, 2, [255, 255, 255, 255])),
+};
+const COS = [1, 0.7, 0, -0.7, -1, -0.7, 0, 0.7], SIN = [0, 0.7, 1, 0.7, 0, -0.7, -1, -0.7];
+function swing(v, target) { return (target === 0 ? 0 : target > 0 ? Math.PI / 2 : -Math.PI / 2) - v * 2.1; } // بک به فازِ متناظر
+
+// ---- متن: هر رشته یک اسپرایت اطلس (RTL/outline از font2) ----
+const TXT = new Map();
+function textRec(txt, col, key, sc = 1) {
+  const k = 'x|' + key + '|' + sc + '|' + txt;
+  let ras = TXT.get(k);
+  if (!ras) {
+    ras = new Raster(Math.max(2, textW(txt, sc) + 4 * sc + 2), 12 * sc + 4);
+    drawText(ras, txt, 2 * sc, 2 * sc, col, sc, { outline: true });
+    TXT.set(k, ras);
+  }
+  return glAtlas(k, ras);
+}
+// ---- مینی‌مپ: چارچوب + نقشه + برچسب طبقه (یک‌بار در هر طبقه) ----
+function minimapRec(run, mini, label, col) {
+  const k = 'mm|' + run.floor + '|' + label;
+  let ras = TXT.get(k);
+  if (!ras) {
+    ras = new Raster(mini.w + 2, mini.h + 14);
+    ras.rect(0, 0, ras.w, ras.h, [12, 10, 24, 175]);
+    mini.over(ras, 1, 1);
+    drawText(ras, label, 2, mini.h + 3, col, 1, { outline: true });
+    TXT.set(k, ras);
+  }
+  return glAtlas(k, ras);
+}
+
+return {BK, glBakeCount, textRec, minimapRec};
+})();
+const {BK, glBakeCount, textRec, minimapRec} = __m_art_glbake;
+const __m_render_gl = (() => {
+// render_gl.js — مسیر رندر HD-2D فاز ۱: دوربین diorama (شیب + پرسپکتیو ملایم)، زمین به‌صورت یک صفحه‌ی
+// شیب‌دار از «فریم زمین»ی که همان مسیر CPU می‌سازد (render با flatOnly=true)، اشیای عمودی billboard با
+// y-sort، افکت‌ها/آب‌وهوا به‌صورت لایه‌ی صفحه‌ای، نور و تینت و محو در شیدر. منطق/سیو/نقشه دست‌نخورده.
+// اگر WebGL2 نباشد، main_app همان مسیر CPU را می‌راند (fallback کامل).
+
+
+
+
+
+
+
+
+
+
+
+
+
+const GCAM = { A: 1.28, S: 0.8594, B: 0.0006, cx: 240, cy: 160, W: 4, H: 4, x0: 0, y0: 0, gw: 0, gh: 0, scale: 1 };
+const MAXL = 24, TOPY = 1e7, VW = 512, VH = 384;
+const GSTAT = { quads: 0, draws: 0, lights: 0, ents: 0 };
+function glGroundRas() { return GR.ras; } // اشکال‌زدایی: فریم زمینِ همین فریم
+const GR = {
+  L: new Float32Array(MAXL * 4), nl: 0, ras: null, fx: null, wx: null,
+  tint: new Float32Array([1, 1, 1, 0]), dark: new Float32Array([13 / 255, 11 / 255, 26 / 255]),
+  cam: new Float32Array(2), view: new Float32Array(2), ax: new Float32Array(2), org: new Float32Array(2), tsz: new Float32Array(2),
+};
+const W4 = [1, 1, 1, 1], FT = [220 / 255, 80 / 255, 80 / 255], _p = [0, 0], ENT = [];
+let en = 0, rkind = 0;
+const RKEY = new WeakMap();
+
+// نگاشت دنیا→صفحه (همان چیزی که شیدر می‌کند — برای نورها و برآورد فریم زمین)
+function glProj(x, y, out) {
+  const dx = x - GCAM.cx, dy = y - GCAM.cy, kz = 1 / (1 - dy * GCAM.B);
+  out[0] = GCAM.W * 0.5 + dx * GCAM.A * kz;
+  out[1] = GCAM.H * 0.5 + dy * GCAM.S * GCAM.A * kz;
+  return kz;
+}
+function glInv(lx, ly) { // صفحه → دنیا (معکوس دقیق kz) برای ورودی
+  const sA = GCAM.S * GCAM.A, uy = ly - GCAM.H * 0.5, ux = lx - GCAM.W * 0.5;
+  const dy = uy / (sA + uy * GCAM.B), kz = 1 / (1 - dy * GCAM.B);
+  return { worldX: GCAM.cx + ux / (GCAM.A * kz), worldY: GCAM.cy + dy };
+}
+function pushE(rec, ax, ay, ox, oy, col, mode, y) {
+  let e = ENT[en];
+  if (!e) e = ENT[en] = {};
+  e.rec = rec; e.ax = ax; e.ay = ay; e.ox = ox; e.oy = oy; e.col = col; e.mode = mode; e.y = y; e.i = en; en++;
+  if (en >= 1200) flushE();
+}
+function pushR(ras, x, y, ox, oy, y2) { pushE(recOf(ras), x, y, ox, oy, W4, 0, y2 == null ? y : y2); }
+function recOf(ras) {
+  let k = RKEY.get(ras);
+  if (!k) { k = 'r' + (++rkind); RKEY.set(ras, k); }
+  return glAtlas(k, ras);
+}
+function flushE() {
+  const list = ENT.slice(0, en);
+  list.sort((a, b) => (a.y - b.y) || (a.i - b.i));
+  for (let i = 0; i < list.length; i++) { const e = list[i]; glPush(e.rec, e.ax, e.ay, e.ox, e.oy, e.col, e.mode); }
+  en = 0;
+}
+function addLight(x, y, rad, st) {
+  if (GR.nl >= MAXL) return;
+  glProj(x, y, _p);
+  if (_p[0] < -rad || _p[1] < -rad || _p[0] > GCAM.W + rad || _p[1] > GCAM.H + rad) return;
+  const o = GR.nl * 4;
+  GR.L[o] = _p[0]; GR.L[o + 1] = _p[1]; GR.L[o + 2] = rad; GR.L[o + 3] = st;
+  GR.nl++;
+}
+// تینت شب/باران مزرعه — همان فرمول applyNight، ولی روی GPU
+function glTintFarm(dayT, raining) {
+  const n = nightFactor(dayT), a = n > 0.45 ? (n - 0.45) / 0.55 * 0.5 : 0;
+  GR.tint[0] = (1 - a) * (raining ? 0.82 : 1);
+  GR.tint[1] = (1 - a * 0.82) * (raining ? 0.86 : 1);
+  GR.tint[2] = (1 - a * 0.55) * (raining ? 0.96 : 1);
+  GR.tint[3] = 0;
+}
+// ---------- مزرعه: موجودات عمودی (billboard) ----------
+function farmEnts(game, t, night, x0, y0, x1, y1) {
+  const f = game.farm;
+  const tx0 = Math.max(0, (x0 >> 4) - 1), tx1 = Math.min(COLS - 1, (x1 >> 4) + 1);
+  const ty0 = Math.max(0, (y0 >> 4) - 2), ty1 = Math.min(ROWS - 1, (y1 >> 4) + 1);
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+    const c = f.cell(tx, ty);
+    if (!c) continue;
+    if (c.kind === 'tree') {
+      const v = c.variant & 1;
+      pushE(BK.tree(v, Math.round(Math.sin(t * 0.85 + tx * 0.9 + v * 2.1))), tx * TILE, ty * TILE, 8, 18, W4, 0, ty * TILE + TILE);
+    } else if (c.kind === 'sign') pushE(BK.sign(), tx * TILE, ty * TILE, 2, 4, W4, 0, ty * TILE + TILE);
+    else if (c.kind === 'scarecrow') pushE(BK.scare(Math.floor(t * 1.4) & 1), tx * TILE, ty * TILE, 2, 4, W4, 0, ty * TILE + TILE);
+  }
+  if (game.toolLvls.sprinkler) pushE(BK.sprk(Math.floor(t * 1.2) & 3), 26 * TILE, 14 * TILE, 2, 2, W4, 0, 15 * TILE);
+  if (game.toolLvls.basket) pushE(BK.crate(Math.floor(t * 2.5) & 1), 18 * TILE, 16 * TILE, 2, 4, W4, 0, 17 * TILE);
+  const ph = night > 0.45 ? 1 : 0;
+  pushE(BK.house(ph + 2 * (Math.floor(t * 1.6) % 3)), 15 * TILE, 16 * TILE, 4, 12, W4, 0, 18 * TILE);
+  if (night > 0.45 && Q.level) pushE(BK.glow(Math.floor(t * 1.4) & 1), 15 * TILE, 16 * TILE, 4, 2, W4, 0, 18 * TILE + 1);
+  pushR(game._heroSprite(), game.hero.x, game.hero.y, HOX, HOY);
+  if (Q.level) for (const wk of game.workers) if (wk.task || Math.hypot(wk.x - game.hero.x, wk.y - game.hero.y) < 330) pushR(wk._frame(t), wk.x, wk.y, HOX, HOY);
+  if (game.marker) pushE(BK.corner(Math.floor(game.marker.t * 2) & 1), game.marker.x * TILE, game.marker.y * TILE, 0, 0, W4, 0, TOPY - 2);
+}
+// ---------- دانجن: مشعل/محراب/هیولا/پرتابه ----------
+function runEnts(run, t, x0, y0, x1, y1) {
+  const D = run.dungeon, h = run.hero;
+  for (const tt of D.torches) {
+    const wx = tt.x * TILE, wy = tt.y * TILE;
+    if (wx < x0 - 40 || wx > x1 + 40 || wy < y0 - 60 || wy > y1 + 40) continue;
+    pushE(BK.torch(Math.floor(t * 6 + tt.x * 3.1 + tt.y * 2.7) % 6), wx, wy, 4, 8, W4, 0, wy + TILE - 1);
+  }
+  if (D.shrine && !D.shrine.used) pushE(BK.shrine(Math.floor(t * 2.4) & 3), D.shrine.x, D.shrine.y, 11, 14, W4, 0, D.shrine.y + 4);
+  for (const e of D.enemies) {
+    if (e.dead) continue;
+    if (e.x < x0 - 90 || e.x > x1 + 90 || e.y < y0 - 150 || e.y > y1 + 90) continue;
+    pushR(e.sprite(), e.x, e.y, 64, e.isBoss ? 112 : 100);
+    if (e.isElite) {
+      pushE(BK.elite(Math.floor(t * 4) & 1), e.x, e.y, 18, 6, W4, 0, e.y + 0.5);
+      pushE(BK.crown(), e.x, e.y - (e.isBoss ? 118 : (MHEAD[e.kind] ?? 76)), 4, 4, W4, 0, TOPY - 3);
+    }
+  }
+  for (const p of run.projs) {
+    const a = Math.atan2(p.vy, p.vx), d = ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
+    pushE(p.kind === 'arrow' ? BK.projArrow(d) : BK.projFire(d), p.x, p.y, 10, 6, W4, 0, TOPY - 5);
+  }
+  if (h.chill > 0) pushE(BK.chill(), h.x, h.y, 4, 2, W4, 0, TOPY - 4);
+  pushR(run._heroSprite(h.hurtT > 0 && Math.floor(h.hurtT * 30) % 2 === 0), h.x, h.y, HOX, HOY);
+  if (run.comboN >= 2 && run.comboT > 0) {
+    const txt = '×' + run.comboN, w = textW(txt, 1);
+    pushE(textRec(txt, [230, 199, 74, 255], 'cb', 1), h.x - w * 0.5, h.y - 58, 2, 2, W4, 0, TOPY - 6);
+  }
+}
+function lightsRun(run, t) {
+  const D = run.dungeon;
+  addLight(run.hero.x, run.hero.y - 14, 78, 195);
+  for (const tt of D.torches) addLight(tt.x * TILE + 8, tt.y * TILE + 6, 44, 157 + 3 * Math.round((Math.sin(t * 6.5 + tt.x * 2.1 + tt.y) + 1) * 2.5));
+  for (const d of D.drops) if (d.kind === 'essence') addLight(d.x, d.y, 10, 100);
+  addLight(D.stairs.x * TILE + 8, D.stairs.y * TILE + 8, 22, 135);
+  if (D.shrine && !D.shrine.used) addLight(D.shrine.x, D.shrine.y, 20, 80 + 12 * Math.round(Math.sin(t * 2.4) + 1));
+}
+// ---------- لایه‌ی افکت‌ها: همان خروجی fx.render، یک کوآد صفحه‌ای (بدون نور، بالای همه) ----------
+function fxLayer(g, w, h) {
+  const fx = g.fx;
+  if (!fx.parts.length && !fx.slashes.length && !fx.floats.length) { GR.fxn = 0; return; }
+  if (!GR.fx || GR.fx.w !== w || GR.fx.h !== h) GR.fx = new Raster(w, h);
+  else GR.fx.clear();
+  fx.render(GR.fx, GCAM.cx - GCAM.W * 0.5, GCAM.cy - GCAM.H * 0.5);
+  glUi(GR.fx, w, h);
+  GR.fxn = 1;
+}
+// ---------- لایه‌ی آب‌وهوا: باران/موج حوضچه/رعد — صفحه‌ای ۱:۱ (روی زمینِ شیب‌دار خط نمی‌کشد) ----------
+function wxLayer(g, W, H) {
+  if (!isRaining(g.dayT)) { GR.wxn = 0; return; }
+  if (!GR.wx || GR.wx.w !== W || GR.wx.h !== H) GR.wx = new Raster(W, H);
+  else GR.wx.clear();
+  drawRain(GR.wx, g.time);
+  drawPondRipples(GR.wx, g.time);
+  if (lightningK(g.dayT, g.time) > 0) drawLightning(GR.wx, g.time);
+  glWx(GR.wx, W, H);
+  GR.wxn = 1;
+}
+function glScene(scene, farm, run, W, H, scale, fade, vig) {
+  const g = scene === 'farm' ? farm : run;
+  GCAM.W = W; GCAM.H = H; GCAM.scale = scale;
+  GLR.uscale = scale;
+  const sA = GCAM.S * GCAM.A, hh = H * 0.5;
+  const dyT = -hh / (sA - hh * GCAM.B), dyB = hh / (sA + hh * GCAM.B);
+  const kzT = 1 / (1 - dyT * GCAM.B), kzB = 1 / (1 - dyB * GCAM.B);
+  const hw = Math.max(W * 0.5 / (GCAM.A * kzT), W * 0.5 / (GCAM.A * kzB)) + 1;
+  const [shx, shy] = g.fx.offset(g.time); // لرزش دوربین (در فریم زمین صفر می‌شود)
+  const lox = hw, hix = WORLD_W - hw;
+  const cx = hix <= lox ? WORLD_W * 0.5 : Math.max(lox, Math.min(hix, g.cam.x + W * 0.5 + shx));
+  const loy = -dyT, hiy = WORLD_H - dyB;
+  const cy = hiy <= loy ? (loy + hiy) * 0.5 : Math.max(loy, Math.min(hiy, g.cam.y + hh + shy));
+  // فریم زمین: مبدأ صحیح (پیکسلی) تا تکسچر زمین و برجستگی‌ها دقیقاً هم‌تراز باشند
+  const x0 = Math.max(0, Math.round(cx - hw)), gw = Math.min(VW, 2 * Math.ceil(hw) + 2);
+  const y0 = Math.max(0, Math.round(cy + dyT)), gh = Math.min(VH, 2 * Math.ceil((dyB - dyT) * 0.5) + 2);
+  GCAM.cx = x0 + gw * 0.5; GCAM.cy = y0 - dyT; GCAM.x0 = x0; GCAM.y0 = y0; GCAM.gw = gw; GCAM.gh = gh;
+  if (!GR.ras || GR.ras.w !== gw || GR.ras.h !== gh) GR.ras = new Raster(gw, gh);
+  const ocx = g.cam.x, ocy = g.cam.y, osh = g.fx.shakeT;
+  g.cam.x = x0; g.cam.y = y0; g.fx.shakeT = 0; GR.ras.flatOnly = true;
+  g.render(GR.ras); // فریم زمین: زمین + دکور سطحی + قطره‌ها (بدون اشیای عمودی/تاریکی/افکت‌ها)
+  GR.ras.flatOnly = false;
+  g.cam.x = ocx; g.cam.y = ocy; g.fx.shakeT = osh;
+  glGround(GR.ras, gw, gh);
+  GR.nl = 0;
+  const t = g.time, rain = scene === 'farm' && isRaining(g.dayT);
+  if (scene === 'farm') {
+    glTintFarm(g.dayT, rain);
+    GLR.flash = rain ? lightningK(g.dayT, t) * 0.26 : 0;
+    farmEnts(g, t, nightFactor(g.dayT), x0, y0, x0 + gw, y0 + gh);
+  } else {
+    GR.tint[0] = 1; GR.tint[1] = 1; GR.tint[2] = 1; GR.tint[3] = 118;
+    GLR.flash = 0;
+    lightsRun(run, t);
+    runEnts(run, t, x0, y0, x0 + gw, y0 + gh);
+  }
+  GR.cam[0] = GCAM.cx; GR.cam[1] = GCAM.cy; GR.view[0] = W; GR.view[1] = H;
+  GR.ax[0] = GCAM.A; GR.ax[1] = sA; GR.org[0] = x0; GR.org[1] = y0; GR.tsz[0] = gw; GR.tsz[1] = gh;
+  GLT.dark = GR.dark;
+  glLights(GR.L, GR.nl);
+  glFrame(GR.cam, GR.ax, GCAM.B, GR.view, GR.tint, GR.org, GR.tsz, Q.level ? 16 : 32);
+  flushE();
+  glFlushSprites();
+  const fw = Math.max(2, Math.round(W / GCAM.A)), fh = Math.max(2, Math.round(H / sA));
+  fxLayer(g, fw, fh); // افکت‌ها با مقیاس معکوس → در صفحه دقیقاً منطبق
+  if (GR.fxn) glLayer(0, W, H, fw / GLT.cw, fh / GLT.ch);
+  if (scene === 'farm') wxLayer(g, W, H);
+  if (GR.wxn) glLayer(1, W, H, W / GLT.cw, H / GLT.ch);
+  if (scene !== 'farm') uiDungeon(run, W, H, cx - W * 0.5, cy - hh);
+  GSTAT.quads = GLR.quads; GSTAT.draws = GLR.draws; GSTAT.lights = GR.nl;
+  glOverlay(fade, vig);
+}
+// متن طبقه + مینی‌مپ (بالای تاریکی، بدون نور)
+function uiDungeon(run, W, H, ox, oy) {
+  const h = run.hero, sp = run._splash, k = sp ? run.time - sp.t0 : -1;
+  let any = false;
+  if (sp && k >= 0 && k < 2.2) {
+    const al = Math.min(1, k / 0.25, (2.2 - k) / 0.45);
+    const txt = t('floor') + ' ' + faNum(sp.n) + (sp.boss ? ' — ' + t('bossFloor') : '');
+    const sc = 2, w = textW(txt, sc), col = sp.boss ? [226, 120, 120, 255] : [255, 224, 130, 255];
+    pushE(textRec(txt, col, sp.boss ? 'bs' : 'fl', sc), W * 0.5 - w * 0.5 - 2 * sc, 30 - 2 * sc, 0, 0, [1, 1, 1, al], 1, TOPY);
+    any = true;
+  }
+  const mini = run._mini;
+  if (mini) {
+    const hsx = Math.round(h.x) - ox, hsy = Math.round(h.y) - oy, my = 3;
+    const mx = (hsx < COLS + 30 && hsy < ROWS + 30) ? W - COLS - 8 : 3;
+    pushE(minimapRec(run, mini, t('floor') + ' ' + faNum(run.floor), [230, 199, 74, 255]), mx, my, 0, 0, W4, 1, TOPY + 1);
+    if (Math.floor(run.time * 4) % 2 === 0) pushE(BK.white(), mx + Math.floor(h.x / TILE), my + Math.floor(h.y / TILE), 0, 1, W4, 1, TOPY + 2);
+    const b = run.dungeon.enemies.find((e) => e.isBoss && !e.dead);
+    if (b) pushE(BK.white(), mx + Math.floor(b.x / TILE), my + Math.floor(b.y / TILE), 0, 0.5, FT, 1, TOPY + 3);
+    any = true;
+  }
+  if (any) { flushE(); glFlushSprites(); }
+}
+
+return {GCAM, GSTAT, glGroundRas, glProj, glInv, glTintFarm, glScene};
+})();
+const {GCAM, GSTAT, glGroundRas, glProj, glInv, glTintFarm, glScene} = __m_render_gl;
 const __m_main_scene = (() => {
 // main_scene.js — وضعیت صحنه و تعویض مزرعه⇄دانجن (جداسازی از main_app.js — ن۳۴):
 // گذار مشکی (fade)، ورود/خروج از دانجن، و «پایان دور» — واریز یک‌باره‌ی گوهر/آمار/مأموریت
@@ -8222,9 +8931,34 @@ const __m_main_app = (() => {
 
 
 
+
+
+
 const canvas = document.getElementById('game');
+// ---------- فاز ۱ HD-2D: مسیر GPU ----------
+// یک بوم فقط یک نوع context می‌گیرد → #game همیشه 2D می‌ماند (مسیر CPU = fallback کامل، حتی اگر
+// وسط بازی کانتکست WebGL2 بیفتد) و WebGL2 روی بومِ شفافِ دوم (#glLayer) بالای آن رندر می‌شود.
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+let glCv = null, GLon = false;
+function bootGL() {
+  const c = document.createElement('canvas');
+  c.id = 'glLayer';
+  c.style.cssText = 'position:fixed;inset:0;display:block;image-rendering:pixelated;touch-action:none;pointer-events:none;z-index:2';
+  document.body.appendChild(c);
+  if (!glInit(c)) { c.remove(); return false; }
+  glCv = c;
+  return true;
+}
+if (!/[?&]cpu/.test(location.search)) GLon = bootGL();
+window.__glOK = GLon;
+function glShow(v) { if (glCv) glCv.style.display = v ? 'block' : 'none'; } // افت کانتکست → مخفی کن
+const _dbg = document.createElement('div');
+_dbg.id = 'gldbg';
+_dbg.style.cssText = 'position:fixed;top:6px;inset-inline-start:6px;z-index:70;font:11px ui-monospace,monospace;color:#aef;background:#000a;padding:4px 7px;border-radius:6px;white-space:pre;display:none;pointer-events:none;direction:ltr';
+document.body.appendChild(_dbg);
+addEventListener('keydown', (e) => { if (e.code === 'KeyG') _dbg.style.display = _dbg.style.display === 'none' ? 'block' : 'none'; });
+if (/[?&]gldbg/.test(location.search)) _dbg.style.display = 'block';
 
 // ---------- اپ + صحنه‌ها ----------
 const app = new App(loadSave());
@@ -8264,6 +8998,11 @@ function resize() {
   sc = new Raster(vw, vh, offImg.data); // صفر-کپی: رندر مستقیم داخل ImageData
   off.width = vw; off.height = vh;
   ctx.imageSmoothingEnabled = false;
+  if (glCv) { // بوم GPU هم‌اندازه‌ی #game
+    glCv.width = canvas.width; glCv.height = canvas.height;
+    glCv.style.width = innerWidth + 'px'; glCv.style.height = innerHeight + 'px';
+    glResize(glCv.width, glCv.height);
+  }
 }
 addEventListener('resize', resize);
 resize();
@@ -8304,7 +9043,7 @@ farmScene.onEvent = (k, n) => { // مأموریت‌ها: برداشت/فروش/
 };
 
 // ---------- حلقه ----------
-let last = performance.now(), fps = 0, fpsT = 0, fpsN = 0, _szChk = 0;
+let last = performance.now(), fps = 0, fpsT = 0, fpsN = 0, _szChk = 0, _glTry = 0;
 let _ambScene = '', _ambRain = false; // آمبینت جاری
 function loop(now) {
   const tA = performance.now(); // هزینه‌ی کار این فریم (بدون انتظار rAF)
@@ -8343,8 +9082,16 @@ function loop(now) {
       }
     }
   }
-  CAM.scale = scale; CAM.camX = Math.round(scene === 'farm' ? farmScene.cam.x : run.cam.x); CAM.camY = Math.round(scene === 'farm' ? farmScene.cam.y : run.cam.y);
-  canvas._cam = CAM;
+  CAM.scale = scale; // پیکسل دستگاه به‌ازای هر پیکسل نما (هر دو مسیر) — ورودی از این تقسیم می‌کند
+  CAM.inv = GLon ? glInv : null; // مسیر GPU: معکوس دقیق دوربین پرسپکتیو (ورودی لمسی/درگ)
+  if (GLon) { // مبدأ معادلِ پای قهرمان در فضای نما (پشتوانه‌ی خطی، اگر inv نبود)
+    CAM.camX = Math.round(GCAM.cx - 0.5 * sc.w / GCAM.A);
+    CAM.camY = Math.round(GCAM.cy - 0.5 * sc.h / (GCAM.S * GCAM.A));
+  } else {
+    CAM.camX = Math.round(scene === 'farm' ? farmScene.cam.x : run.cam.x);
+    CAM.camY = Math.round(scene === 'farm' ? farmScene.cam.y : run.cam.y);
+  }
+  canvas._cam = CAM; // ورودی همیشه روی #game (بوم GL شفاف و pointer-events:none است)
   if (scene === 'dungeon' && run && run.dungeon.shrine) { // محراب: نزدیک = باز، دور = بسته
     const sh = run.dungeon.shrine;
     const dsh = Math.hypot(run.hero.x - sh.x, run.hero.y - sh.y);
@@ -8362,16 +9109,38 @@ function loop(now) {
     const raining = scene === 'farm' && isRaining(farmScene.dayT);
     if (raining !== _ambRain) { _ambRain = raining; setRain(raining); }
   }
-  (scene === 'farm' ? farmScene : run).render(sc);
-  if (Q.level && scene === 'dungeon') vignette(sc.w, sc.h).apply(sc); // وینیت فقط دانجن — مزرعه روشن و تمیز (ن۳۶: سیاهیِ گوشه‌ها حذف شد)
-  S.applyFade(sc, dt);
-  offCtx.putImageData(offImg, 0, 0); // sc.d همان offImg.data است — بدون کپی ۶۰۰KB!
-  ctx.drawImage(off, 0, 0, sc.w, sc.h, 0, 0, sc.w * scale, sc.h * scale);
-  if (sc.h * scale < canvas.height) { // ن۴۰: باندِ زیر داک (نما کوتاه‌تر از بوم) — پاک تا فریم کهنه نماند
-    ctx.fillStyle = '#141124';
-    ctx.fillRect(0, sc.h * scale, canvas.width, canvas.height - sc.h * scale);
+  if (GLon !== GLR.ok) { // افت کانتکست WebGL2 (موبایل) → CPU؛ بازگشت → دوباره GPU
+    GLon = GLR.ok; glShow(GLon); window.__glOK = GLon;
+    if (GLon) resize();
+  }
+  // تلاش دوره‌ای برای احیا: بعضی مرورگرها رخداد webglcontextrestored را نمی‌دهند (headless/SwiftShader)
+  if (!GLon && glCv && _emaMs >= 0 && now - _glTry > 2000) {
+    _glTry = now;
+    if (glInit(glCv)) { GLon = true; glShow(true); window.__glOK = true; resize(); }
+  }
+  const g0 = scene === 'farm' ? farmScene : run;
+  if (GLon) { // مسیر GPU: زمین شیب‌دار + billboard + نور/تینت/محو در شیدر
+    glScene(scene === 'farm' ? 'farm' : 'dungeon', farmScene, run, sc.w, sc.h, scale, S.getFade(), Q.level && scene !== 'farm' ? 1 : 0);
+    S.applyFade(sc, dt); // فقط پیشبرد وضعیت گذار مشکی (تصویر GPU جداست)
+    if (window.__glCap) { window.__glCap = 0; window.__glShot = shotURL(); }
+  } else {
+    g0.render(sc);
+    if (Q.level && scene === 'dungeon') vignette(sc.w, sc.h).apply(sc); // وینیت فقط دانجن — مزرعه روشن و تمیز (ن۳۶: سیاهیِ گوشه‌ها حذف شد)
+    S.applyFade(sc, dt);
+    offCtx.putImageData(offImg, 0, 0); // sc.d همان offImg.data است — بدون کپی ۶۰۰KB!
+    ctx.drawImage(off, 0, 0, sc.w, sc.h, 0, 0, sc.w * scale, sc.h * scale);
+    if (sc.h * scale < canvas.height) { // ن۴۰: باندِ زیر داک (نما کوتاه‌تر از بوم) — پاک تا فریم کهنه نماند
+      ctx.fillStyle = '#141124';
+      ctx.fillRect(0, sc.h * scale, canvas.width, canvas.height - sc.h * scale);
+    }
   }
   UI.refreshHud(false);
+  if (_dbg.style.display !== 'none') {
+    _dbg.textContent = (GLon ? 'GL2 ' + GSTAT.quads + 'q ' + GSTAT.draws + 'd ' + GSTAT.lights + 'L' : 'CPU') +
+      '\nf ' + _emaMs.toFixed(1) + 'ms ' + (scene === 'farm' ? 'farm' : 'dun ' + run.floor) +
+      '\ncam ' + GCAM.cx.toFixed(1) + ',' + GCAM.cy.toFixed(1) + ' A' + GCAM.A + ' S' + GCAM.S + ' B' + GCAM.B +
+      '\nbakes ' + glBakeCount() + ' atlas ' + GLT.cw + 'x' + GLT.ch;
+  }
   fpsN++; fpsT += dt;
   if (fpsT >= 0.5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; $('fps').textContent = `${faNum(fps)} ${t('fps')}`; }
   // ---- کیفیت تطبیقی: اگر کارِ فریم به‌طور پیوسته گران بود، افکت‌های غیرضروری خاموش شوند ----
@@ -8390,6 +9159,28 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// ---------- قلاب‌های تست (Playwright): عکس مسیر GPU داخل تسک رسم ----------
+function shotURL() {
+  const rb = glReadback();
+  const c = document.createElement('canvas');
+  c.width = rb.w; c.height = rb.h;
+  const c2 = c.getContext('2d');
+  const im = c2.createImageData(rb.w, rb.h);
+  im.data.set(rb.d);
+  c2.putImageData(im, 0, 0);
+  return c.toDataURL('image/png');
+}
+window.__cmd = (x, y) => farmScene.command(x * TILE + 8, y * TILE + 8); window.__glRas = glGroundRas; window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
+window.__glBakes = glBakeCount; window.__glCapture = () => { window.__glCap = 1; return true; };
+window.__glPng = () => window.__glShot || '';
+window.__glRest = () => ({ restores: GLR.restores, ok2: GLR.ok2, ok: GLR.ok, progs: !!GLR.progs, h: typeof (glCv && glCv.onwebglcontextrestored) });
+window.__glProbe = () => { // مقادیر واقعی یونیفرم‌های برنامه‌ی زمین (اشکال‌زدایی)
+  const gl = GLR.gl; if (!gl || !GLR.progs) return null;
+  const pr = GLR.progs.g, g2 = (n) => { const v = gl.getUniform(pr.p, gl.getUniformLocation(pr.p, n)); return v && v.length ? Array.from(v) : v; };
+  return { ax: g2('u_ax'), cam: g2('u_cam'), org: g2('u_org'), tsz: g2('u_tsize'), view: g2('u_view'), vp: g2('u_vp'), scale: g2('u_scale'), persp: g2('u_persp'), uscale: GLR.uscale };
+};
+window.__glDiag = () => ({ ok: GLon, gl2: !!(GLR.gl && GLR.ok), glErr: GLR.gl ? GLR.gl.getError() : -1, ok2: GLR.ok, quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, bakes: glBakeCount(), cam: [GCAM.cx, GCAM.cy, GCAM.A, GCAM.S, GCAM.B], view: [sc && sc.w, sc && sc.h], scale, ms: _emaMs });
 
 // ---------- ذخیره‌ی دوره‌ای ----------
 setInterval(saveNow, 3000);

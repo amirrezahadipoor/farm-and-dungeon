@@ -43,6 +43,7 @@ export function farmHeroSprite(game) {
 
 // رندر کامل صحنه‌ی مزرعه در Raster
 export function renderFarm(game, r) {
+    const flat = !!r.flatOnly; // فاز ۱ HD-2D: فریم زمین برای مسیر GPU — فقط لایه‌ی زمین/دکورِ سطحی
     const cx = Math.round(clamp(game.cam.x, Math.min(0, (WORLD_W - r.w) / 2), Math.max(0, WORLD_W - r.w)));
     const cy = Math.round(clamp(game.cam.y, Math.min(0, (WORLD_H - r.h) / 2), Math.max(0, WORLD_H - r.h)));
     const f = game.farm, wf = [0, 1, 2, 1][Math.floor(game.time * 0.9) % 4]; // موج آب: سیکل آرام ~۱٫۱ث/فریم (ن۳۷)
@@ -82,16 +83,16 @@ export function renderFarm(game, r) {
         if (below && below.farmable && below.kind === 'grass') groundSprite('bush').over(r, sx, sy);
       }
       // ---- دکور زنده‌ی مزرعه (آرت جدا در js/art/) ----
-      if (c.kind === 'sign') drawSaleSign(r, sx, sy, game.time);
-      else if (c.kind === 'scarecrow') drawScarecrow(r, sx, sy, game.time); // نگهبان پرنده‌ها
+      if (!flat && c.kind === 'sign') drawSaleSign(r, sx, sy, game.time); // مسیر GPU: billboard جدا
+      else if (!flat && c.kind === 'scarecrow') drawScarecrow(r, sx, sy, game.time); // نگهبان پرنده‌ها
       else if (c.kind === 'grass' && !f.insideFence(tx, ty)) drawMeadow(r, sx, sy, tx, ty, game.time, c.db); // db = نزدیکی مسیر/آب → گل بیشتر
-      if (tx === 26 && ty === 14 && game.toolLvls.sprinkler) drawSprinkler(r, sx, sy, game.time); // آبپاش: بالای حوضچه، از آن آب می‌کشد
-      if (tx === 18 && ty === 16 && game.toolLvls.basket) drawBasketCrate(r, sx, sy, game.time); // سبد: کنار خانه
+      if (!flat && tx === 26 && ty === 14 && game.toolLvls.sprinkler) drawSprinkler(r, sx, sy, game.time); // آبپاش: بالای حوضچه، از آن آب می‌کشد
+      if (!flat && tx === 18 && ty === 16 && game.toolLvls.basket) drawBasketCrate(r, sx, sy, game.time); // سبد: کنار خانه
       else if (c.kind === 'water') drawWaterLife(r, sx, sy, tx, ty, game.time);
       if (c.crop && f.mature(c)) drawReadySparkle(r, sx, sy, tx, ty, game.time, !!c.crop.g);
     }
-    // نشانگر هدف (گوشه‌های چشمک‌زن)
-    if (game.marker) {
+    // نشانگر هدف (گوشه‌های چشمک‌زن) — در مسیر GPU به‌صورت billboard جدا رسم می‌شود
+    if (!flat && game.marker) {
       const m = game.marker, sx = m.x * TILE - cx, sy = m.y * TILE - cy;
       const col = Math.floor(m.t * 2) % 2 ? E.gold : E.white; // ن۳۷: چشمک نشانگر آرام‌تر (۲Hz)
       const c3 = 3;
@@ -100,7 +101,9 @@ export function renderFarm(game, r) {
       r.rect(sx - 1, sy + TILE, c3 + 1, 1, col); r.rect(sx - 1, sy + TILE - c3, 1, c3, col);
       r.rect(sx + TILE - c3, sy + TILE, c3 + 1, 1, col); r.rect(sx + TILE - 1, sy + TILE - c3, 1, c3, col);
     }
+    if (flat) game.fish.draw(r, cx, cy, game.time, f); // ماهی روی صفحه‌ی زمین (زیر موجودات) — مسیر GPU
     // درخت‌ها + قهرمان + کارگر — مرتب بر اساس y (pool بازمصرف، صفر تخصیص)
+    if (!flat) {
     const h = game.hero;
     let fn = 0, tn = 0;
     for (let ty2 = y0; ty2 <= y1; ty2++) for (let tx2 = x0; tx2 <= x1; tx2++) {
@@ -141,5 +144,6 @@ export function renderFarm(game, r) {
       drawPondRipples(r, game.time); // موج روی حوضچه
       const lk = lightningK(game.dayT, game.time); // رعد و برق — فقط باران
       if (lk > 0) { flashTint(r, lk); drawLightning(r, game.time); }
+    }
     }
   }

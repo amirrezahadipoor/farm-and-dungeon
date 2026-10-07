@@ -1,0 +1,285 @@
+{
+ "url": "http://localhost:8080/game.html",
+ "results": [
+  {
+   "mode": "gl",
+   "vp": "phone",
+   "gl": true,
+   "view": [
+    195,
+    349
+   ],
+   "scale": 4,
+   "quads": 14,
+   "draws": 2,
+   "glErr": 0,
+   "hero": [
+    264,
+    296
+   ],
+   "cam": [
+    266,
+    175,
+    1.28,
+    0.8594
+   ],
+   "fade": 1,
+   "running": true,
+   "tap": {
+    "dx": 32,
+    "before": {
+     "x": 264,
+     "y": 296
+    },
+    "after": {
+     "x": 296,
+     "y": 252
+    }
+   },
+   "errs": [],
+   "ok": true
+  },
+  {
+   "mode": "gl",
+   "vp": "landscape",
+   "gl": true,
+   "view": [
+    422,
+    145
+   ],
+   "scale": 4,
+   "quads": 17,
+   "draws": 2,
+   "glErr": 0,
+   "hero": [
+    264,
+    296
+   ],
+   "cam": [
+    265,
+    248,
+    1.28,
+    0.8594
+   ],
+   "fade": 1,
+   "running": true,
+   "tap": {
+    "dx": 16,
+    "before": {
+     "x": 264,
+     "y": 296
+    },
+    "after": {
+     "x": 280,
+     "y": 296
+    }
+   },
+   "errs": [],
+   "ok": true
+  },
+  {
+   "mode": "gl",
+   "vp": "desktop",
+   "gl": true,
+   "view": [
+    320,
+    149
+   ],
+   "scale": 4,
+   "quads": 11,
+   "draws": 2,
+   "glErr": 0,
+   "hero": [
+    264,
+    296
+   ],
+   "cam": [
+    266,
+    246,
+    1.28,
+    0.8594
+   ],
+   "fade": 1,
+   "running": true,
+   "tap": {
+    "dx": 16,
+    "before": {
+     "x": 264,
+     "y": 296
+    },
+    "after": {
+     "x": 280,
+     "y": 280
+    }
+   },
+   "errs": [],
+   "ok": true
+  },
+  {
+   "mode": "cpu",
+   "vp": "phone",
+   "gl": false,
+   "view": [
+    195,
+    349
+   ],
+   "scale": 4,
+   "quads": 0,
+   "draws": 0,
+   "glErr": -1,
+   "hero": [
+    264,
+    296
+   ],
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594
+   ],
+   "fade": 1,
+   "running": true,
+   "tap": {
+    "dx": 32,
+    "before": {
+     "x": 264,
+     "y": 296
+    },
+    "after": {
+     "x": 296,
+     "y": 250
+    }
+   },
+   "errs": [],
+   "ok": true
+  },
+  {
+   "mode": "cpu",
+   "vp": "landscape",
+   "gl": false,
+   "view": [
+    422,
+    145
+   ],
+   "scale": 4,
+   "quads": 0,
+   "draws": 0,
+   "glErr": -1,
+   "hero": [
+    264,
+    296
+   ],
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594
+   ],
+   "fade": 1,
+   "running": true,
+   "tap": {
+    "dx": 32,
+    "before": {
+     "x": 264,
+     "y": 296
+    },
+    "after": {
+     "x": 296,
+     "y": 296
+    }
+   },
+   "errs": [],
+   "ok": true
+  },
+  {
+   "mode": "cpu",
+   "vp": "desktop",
+   "gl": false,
+   "view": [
+    320,
+    149
+   ],
+   "scale": 4,
+   "quads": 0,
+   "draws": 0,
+   "glErr": -1,
+   "hero": [
+    264,
+    296
+   ],
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594
+   ],
+   "fade": 1,
+   "running": true,
+   "tap": {
+    "dx": 16,
+    "before": {
+     "x": 264,
+     "y": 296
+    },
+    "after": {
+     "x": 280,
+     "y": 280
+    }
+   },
+   "errs": [],
+   "ok": true
+  }
+ ],
+ "ok": true,
+ "inv": {
+  "cam": [
+   259,
+   186.489469662358,
+   1.28,
+   0.8594
+  ],
+  "res": [
+   {
+    "lx": 10,
+    "ly": 10,
+    "wx": 183.45,
+    "wy": 11.17,
+    "px": 10,
+    "py": 10
+   },
+   {
+    "lx": 97,
+    "ly": 175,
+    "wx": 258.61,
+    "wy": 177.81,
+    "px": 97,
+    "py": 175
+   },
+   {
+    "lx": 185,
+    "ly": 340,
+    "wx": 322.01,
+    "wy": 316.8,
+    "px": 185,
+    "py": 340
+   },
+   {
+    "lx": 60,
+    "ly": 300,
+    "wx": 231.44,
+    "wy": 285.26,
+    "px": 60,
+    "py": 300
+   },
+   {
+    "lx": 180,
+    "ly": 40,
+    "wx": 328.97,
+    "wy": 43.89,
+    "px": 180,
+    "py": 40
+   }
+  ],
+  "worstErr": 0
+ }
+}

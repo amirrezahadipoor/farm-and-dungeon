@@ -1,0 +1,71 @@
+{
+ "note": "ema = game-loop work per frame (ms), sampled on a quiet stream (no capture readback)",
+ "scenes": {
+  "cpu": {
+   "farm_day": {
+    "med": 0.3,
+    "p90": 0.33,
+    "n": 40
+   },
+   "farm_night": {
+    "med": 0.54,
+    "p90": 0.56,
+    "n": 40
+   },
+   "farm_rain": {
+    "med": 0.48,
+    "p90": 0.5,
+    "n": 40
+   },
+   "dungeon": {
+    "med": 0.96,
+    "p90": 1.12,
+    "n": 40
+   },
+   "dungeon_f1": {
+    "med": 0.91,
+    "p90": 0.99,
+    "n": 40
+   },
+   "battle": {
+    "med": 0.96,
+    "p90": 1.01,
+    "n": 40
+   }
+  },
+  "gl": {
+   "farm_day": {
+    "med": 0.36,
+    "p90": 0.42,
+    "n": 39
+   },
+   "farm_night": {
+    "med": 0.27,
+    "p90": 0.29,
+    "n": 38
+   },
+   "farm_rain": {
+    "med": 0.35,
+    "p90": 0.38,
+    "n": 38
+   },
+   "dungeon": {
+    "med": 0.86,
+    "p90": 1.53,
+    "n": 26
+   },
+   "dungeon_f1": {
+    "med": 0.92,
+    "p90": 1.04,
+    "n": 25
+   },
+   "battle": {
+    "med": 0.84,
+    "p90": 0.9,
+    "n": 22
+   }
+  }
+ },
+ "cpu_errs": [],
+ "gl_errs": []
+}

@@ -1,7 +1,7 @@
 # 🧠 MEMORY — بازی «مزرعه و دانجن»
 
 > حافظه‌ی عامل: **نقشه‌ی فایل‌ها (دقیق/per-file)** + وضعیت خطی + اعداد + درس‌ها + قواعد کاربر.
-> آخرین به‌روزرسانی: 2026-10-07 (پایان نوبت ۵۰ — فاز ۰ پروژه‌ی HD-2D).
+> آخرین به‌روزرسانی: 2026-10-07 (پایان نوبت ۵۱ — فاز ۱ پروژه‌ی HD-2D: رندرر GPU + دوربین دیوراما).
 
 ## 🚨 اول هر نوبت
 1. سرور: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/game.html` — اگر 000: `start_process` با `cd /home/user/farm-and-dungeon/farm-dungeon && node serve.mjs`
@@ -18,9 +18,10 @@
 farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی والد؛ کنار آن `farm-dungeon-fixed.zip` — zip بعد از هر فاز بازتولید و کامیت می‌شود)
 ├── game.html ⭐ باندل تک‌فایل ۴۳۱٬۵۵۱B = ۱۰۸ ماژول + CSS اینلاین (تنها خروجی بیلدر؛ md5 ۵۴۲e۷۰… قبل از ن۵۰)
 ├── index.html (ورودی بیلدر: شل + اسکریپت main_app) · css/style.css (تنها CSS) · serve.mjs (:8080 no-store) · MEMORY.md · PHASE0.md (گزارش فاز ۰ HD-2D)
-├── shots/ (۶ قدیمی + ۱۹ فاز ۰): stage47_elites.gif · stage47_montage.png · art48_review.png · mobs44_sheet.png · tiles43_sheet.png · font41_sheet.png
+├── shots/ (۶ قدیمی + ۱۹ فاز ۰ + فاز ۱: p1_*_gl/p1_*_dom/p1c_*_dom (۵ صحنه×۳) · p1_sheet.png · p1_metrics1.json · p1_bench.json · p1_boot.json · p1_gl_report.json · p1_dbg_*): stage47_elites.gif · stage47_montage.png · art48_review.png · mobs44_sheet.png · tiles43_sheet.png · font41_sheet.png
 │   · فاز ۰: p0_baseline_sheet.png (شیت اصلی) · p0_scene_*.png (رستر پیکسل‌دقیق ۷ صحنه) · p0_raw_*.png (همان رستر خام) · p0_full_*.png (با UI) · p0_webgl_*.png (dump بوم) · p0_metrics.json · p0_audit.json
-├── tools/ (۱۲): audit0.mjs (فاز ۰: Playwright سه‌نما + بنچ + اسکرین‌شات) · analyze0.py (ممیزی عددی + شیت) · build_single.mjs (باندلر: BASE پشت‌سرهم، فقط export const/function؛ entry جدا: bundle('index.html','game.html','main_app'))
+├── tools/ (۱۶): audit0.mjs (فاز ۰: Playwright سه‌نما + بنچ + اسکرین‌شات) · analyze0.py (ممیزی عددی + شیت) · build_single.mjs (باندلر: BASE پشت‌سرهم، فقط export const/function؛ entry جدا: bundle('index.html','game.html','main_app'))
+│   · gltest.mjs (فاز ۱: ۵ صحنه × GPU/CPU + عکس خام فریم GPU) · bench1.mjs (ema پنجره‌ی آرام) · boot1.mjs (ماتریس ۲مسیر×۳نما + تپ/دوربین) · phase1_sheet.py (شیت/متریک فاز ۱)
 │   · render5.mjs ⟨۱۵ رگرسیون⟩ · render6.mjs ⟨۲۷ پولیش⟩ · elite47.mjs ⟨۴ تست تاج+GIF نخبه → /tmp/qa47⟩
 │   · build_bp42.py (مولد/ولیداتور نقشه‌ها) · author_font41.py (منبع حقیقت فونت) · mobs44_sheet.mjs · tiles43_sheet.mjs · png.mjs · bench.mjs
 └── js/
@@ -28,17 +29,19 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
     │   · fx⟨129⟩ ذرات/وینیت-فقط-دانجن · night⟨26⟩ LUT شب · i18n⟨126⟩ fa/en+t() · save⟨73⟩ v6+migrate · input⟨86⟩ کیبورد+لمس
     │   · ui⟨160⟩ توست/منو/آیکون · quests⟨51⟩ چرخان×۳ · items⟨79⟩ ۱۲ پوشیدنی+دراپ
     ├── مزرعه ⟨۱۱⟩: game⟨199⟩ حرکت/صف/سیب · game_apply⟨71⟩ ابزار+اقتصاد برداشت · farm⟨134⟩ گرید+CROPS+WATER_TIME+soak/_wetBare
-    │   · farm_layout⟨76⟩ · farm_command⟨90⟩ تپ→nearFree · farm_worker⟨184⟩ · farm_render⟨144⟩
+    │   · farm_layout⟨76⟩ · farm_command⟨90⟩ تپ→nearFree · farm_worker⟨184⟩ · farm_render⟨149⟩ (flatOnly)
     │   · app⟨201⟩ UPG/MEALS/آفلاین/serializeFarm · app_ui⟨127⟩ چسب DOM · ui_hud⟨69⟩ · ui_shrine⟨48⟩
-    ├── دانجن ⟨۱۱+۲۲⟩: main_app⟨192⟩ بوت/ورودی/حلقه/سیو (entry بیلدر — «یتیم» نیست!) · main_scene⟨99⟩ fade/ورود-خروج/bankRun
-    │   · run⟨255⟩ حرکت/طبقه/مهارت/دوج/برکت/chill-ریست · run_combat⟨90⟩ حمله‌ی خودکار/runHit · run_loot⟨83⟩ · run_render⟨220⟩ (تاج بعد از اسپرایت، اسپلش زیر موجودیت‌ها)
+    ├── دانجن ⟨۱۱+۲۲⟩: main_app⟨260⟩ بوت/ورودی/حلقه/سیو + بوت دوگانه GPU/CPU + پنل دیباگ G (entry بیلدر — «یتیم» نیست!) · main_scene⟨99⟩ fade/ورود-خروج/bankRun
+    │   · run⟨255⟩ حرکت/طبقه/مهارت/دوج/برکت/chill-ریست · run_combat⟨90⟩ حمله‌ی خودکار/runHit · run_loot⟨83⟩ · run_render⟨228⟩ (تاج بعد از اسپرایت، اسپلش زیر موجودیت‌ها، flatOnly)
     │   · dungeon⟨125⟩ انتخاب+قرینه ۵۰٪+تم · dungeon_blueprints⟨66⟩ رجیستری+validate
     │   · dungeon/ (۲۲ فایل ~۲۷ خطی): bp01…bp21.js + bp_boss.js — هرکدام `export const BPXX={name,rows}` ۳۰×۲۰
     │   · monster⟨129⟩ STATS+نخبه+کش اسپرایت · mobs_new⟨174⟩ AI_EXT تیرانداز/یورش/دزدی/جهش + MOB_TAGS · projectiles⟨43⟩ تیر/گوی
     ├── art/ ⟨۲۶⟩: پالت — palette_env⟨38⟩ P→E+کش اسپرایت · palette_hero⟨36⟩ · recolor⟨38⟩ · quality⟨3⟩
     │   · محیط — ground⟨227⟩ DTHEME×۴+فرش+آب زنده · dungeon_depth⟨42⟩ DPAL تک‌منبع · dungeon_props⟨111⟩ · farm_decor⟨73⟩
     │   │   · farm_buildings⟨110⟩ · tree⟨53⟩ · weather⟨91⟩ · critters⟨64⟩ · light⟨69⟩ applyDarkness+LUT · rim⟨22⟩
-    │   · قهرمان — hero_pose⟨131⟩ ریاضی پوز+HOX/HOY · hero⟨243⟩ رسم+halfSprite · equipment⟨99⟩
+    │   · GPU فاز ۱ — gl⟨191⟩ هسته WebGL2+شیدرها+boot/readback · gl_batch⟨180⟩ آطلس/مش/batcher/لایه‌ها · glbake⟨67⟩ پخت رویه‌ای+متن+مینی‌مپ
+│   │   · render_gl⟨240⟩ دوربین دیوراما+y-sort+نور+لایه‌ی افکت/آب‌وهوا (مسیر CPU = fallback؛ `render(r).flatOnly` = فریم زمین)
+│   · قهرمان — hero_pose⟨131⟩ ریاضی پوز+HOX/HOY · hero⟨243⟩ رسم+halfSprite · equipment⟨99⟩
     │   · هیولا — monster_parts⟨73⟩ MC/MOX/MOY/MHEAD(۱۴جور) · monster_bodies⟨280⟩ ۷ کلاسیک→MBODY_A · monster_bodies2⟨261⟩ ۷ نوی۴۴
     │   │   · monster_registry⟨6⟩ ادغام→MBODY/MOUT/MSHW تک‌منبع · monsters⟨26⟩ فریم: body→rim→outline→فلش→سایه · boss⟨129⟩ گولم‌لرد ۳فاز
     │   · محصولات/فونت/آیکون — crops⟨124⟩ ۴مرحله+آیکون سیب · font2⟨174⟩ ۹۵ گلیف دوزبانه RTL+outline کش · icons⟨261⟩ paintIcon/iconEl
@@ -48,6 +51,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 
 ## ✅ وضعیت (هر نوبت یک خط — جزئیات در شیت/اسکریپت همان نوبت)
 - قابل بازی: game.html روی :8080 · نوبت جاری: **ن۴۸ آرت-ممیزی سنجه‌محور ~۵٫۵/۱۰ سخت‌گیرانه** — کمبودها: **P1 خوانایی** bat ΔL=۳ و فقط ۱۵px، bandit ΔL=۵، spider ۲۱، ghost ۱۰ (نیمه‌عمدی)، outline اسکلت/کماندار L~۸۶=حاشیه نه outline · **P2 سبک** پالت قهرمان ۸۲ رنگ↔موب‌ها ۵-۹ (ژاکارد ۰٫۰۱۷)، outline غیریکدست (انحراف ۴۲)، اسکلت/کماندار ۲ باند سایه، صفر بافت/dither (فاصله‌ی اصلی با استاردیو) · **P3** محصول ۴ مرحله (استاردیو ۵) و رسیده ۷-۱۳px، حمله‌ی اسکلت ۱۵٪/کماندار ۱۹٪ کم‌خوانا، idle hare/golem/boss ۱۱-۱۴٪ یخ‌زده، اسکلت ۲٫۳t>قهرمان ۱٫۸t، گلیف ص/ض/ط/ظ ۸px در شبکه‌ی ۷ · قوت‌ها: خط لوله‌ی منظم، انیمیشن ۴حالته، فونت ۹۵ گلیف، باس≠گولم، صحنه ۱۰۸-۱۷۰ رنگ · سنجه‌ها: shots/art48_review.png (اسکریپت اندازه‌گیری /tmp/artaudit48.mjs — سنجه‌ها: پالت کوانتیزه >>۴، خوشه‌ی روشنایی ≥۸٪، ΔL در برابر کفِ L=۷۲، ژاکارد، diffRatio)
+- ن۵۱ 🎮 **فاز ۱ پروژه‌ی HD-2D — رندرر GPU + دوربین دیوراما**: ۴ ماژول جدید (`art/gl`, `art/gl_batch`, `art/glbake`, `render_gl`) + مسیر دوگانه در `main_app` (WebGL2 روی خودِ #game، به‌جز `?cpu=1`؛ jsdom/بدون‌WebGL2 → مسیر CPU قدیمی) · زمین = **صفحه‌ی تکسچر شیب‌دار** از «فریم زمین»ِ همان کد CPU (`r.flatOnly`) · اشیا = بیلبورد ایستاده با y-sort و مقیاس یکنواخت (u_ax.y) · افکت/آب‌وهوا/اسپلش/مینی‌مپ = لایه‌های صفحه‌ای · نور/تینت/محو/وینیت در شیدر (۲۴ نور، مدل یکسان مزرعه/دانجن) · زیرپیکسل با گردکردن سازگار · **راستی‌آزمایی**: دوره‌ی افقی زمین CPU ۱۶px → GPU ۵–۱۴px (پرسپکتیو واقعی) · boot1 **PASS** (GPU+CPU × ۳ نما، glErr=0، صفر خطای JS، تپ→حرکت ۱۶–۳۲px، خطای معکوس دوربین ۰٫۰px) · بنچ ema آرام: مزرعه‌ی روز ۰٫۲۸→۰٫۲۷ · شب ۰٫۴۸→۰٫۲۸ · باران ۰٫۴۹→۰٫۴۲ · دانجن ۰٫۸۶→۰٫۹۰ · نبرد ۰٫۹۴→۰٫۸۰ms با ۲–۴ draw call · **نمره‌ی صادقانه ۱۷/۷۰ (۲٫۴/۱۰)** (۱:۰→۴ فقط مورد هدف این فاز) · **چیدمان دو-بومی**: #game همیشه 2D + #glLayer شفاف برای WebGL (یک بوم = یک context؛ افت کانتکست = مرگ حلقه!) + خودترمیمی (رخداد restored + تلاش دوره‌ای ۲ث) · smoke1 PASS: فرمان واقعی→راه‌رفتن۲۳۸px→کندن→کاشتن · دانجن مهارت+طبقه۲ · افت/بازگشت کانتکست بی‌خطا · ۹ باگ مسیر (render فقط r را فوروارد می‌کند! UV زمین نسبت به تکسچر · uniform2f با آرایه · یک بوم=یک context · CAM.scale · کشیدگی افقی بیلبورد · پنل دیباگ در اسکرین‌شات · readback بنچ را آلوده می‌کند) · جزئیات `PHASE1.md`
 - ن۵۰ 🎮 **فاز ۰ پروژه‌ی HD-2D** (ممیزی/پایه — صفر تغییر در کد بازی): محیط بصری راه افتاد (Playwright 1.63 + chromium_headless_shell 153 + SwiftShader WebGL2 · `tools/audit0.mjs` + `tools/analyze0.py`) · ۳ نما (موبایل ۳۹۰×۸۴۴@2 → رستر ۱۹۵×۳۴۹ / افقی / دسکتاپ) × ۷ اسکرین‌شات صحنه + ۴ UI + شیت `shots/p0_baseline_sheet.png` + `p0_metrics.json`/`p0_audit.json` · بوت صفر خطا در هر سه نما · بنچ CPU (۱۹۵×۳۴۹): مزرعه‌ی روز ۱٫۰۲ / شب ۰٫۸۲ / باران ۱٫۲۷ / غروب ۰٫۷۹ / دانجن ۲٫۲۷ / نبرد ۱٫۲۹ / باس ۱٫۹۳ms (present ۰٫۲–۰٫۵ = گلوگاه) · rAF headless ≈ ۲۴ms **کف محیط (SwiftShader) نه شاهد GPU** · ممیزی عددی: bloom ۰٪ · سهم رنگ غالب تایل ۰٫۸۰ مزرعه/۰٫۵۵ دانجن · خودهمبستگی عمودی زمین ۱۶px (=بدون عمق) · رنگ ۱۵۵/۲۹۷/۴۹۰ (مزرعه/دانجن/باس) · **نمره‌ی صادقانه ۱۳/۷۰ ≈ ۱٫۹/۱۰** (۱:۰ ۲:۰ ۳:۱ ۴:۳ ۵:۳ ۶:۲ ۷:۴) · رگرسیون پاس: render5 ۱۵/۱۵ + render6 ۲۷/۲۷ · گزارش کامل `PHASE0.md` · **فاز ۱ هنوز تأیید/شروع نشده**
 - ن۴۹: **باگ‌های ظاهری + پولیش** — (۱) تایل‌های fence/fencePost شفاف بودند (بدون چمن زیرشان → سیاهی/ردّ فریم قبل روی بوم) → چمن زیرشان در farm_render · (۲) خاک‌راه: تایل‌های «نان‌مانند» جدا → تایل پر + حاشیه‌ی دندانه‌ای per-همسایه `drawPathEdge` (farm_decor) + سنگ‌ریزه‌ی پراکنده · (۳) دروازه‌ی ۲×۲ دو در روی هم بود → طاق یکپارچه (variant 0 سردر / 1 آستانه) · (۴) گندم رسیده شبیه «میز» → سه سنبله‌ی طلایی با ریشک · (۵) فونت font2: حروف کوچک لاتین «؟» می‌شدند (Floor→F????) → نگاشت به بزرگ؛ نیم‌فاصله‌ی U+200C «؟» رسم می‌شد → حذف؛ ارقام داخل جمله‌ی فارسی برعکس بودند (۱۲۳→۳۲۱) → bidi ردیف‌های LTR؛ alias آ/أ/ي/ك/٪/—/→ و گلیف ( ) = ·؛ ۳ شبیه «؟» بود → سه‌قوسی · بیلد+بوت jsdom صفر خطا · شفافیت: صفر پیکسل alpha=0 در مزرعه و ۵ طبقه‌ی دانجن
 - ن۴۷: ۶ فیکس — تاج نخبه MHEAD per-kind (۱۴ جور کالیبره از رندر واقعی) + تاج بعد از اسپرایت (خز وسطش را می‌خورد) + اسپلش زیر موجودیت‌ها + صدای shoot/fire + chill ریست + monster_registry (همه ≤۲۸۰ خط) · wire سخت‌گیر BASE∪entry 108/108 (۲ صدا import می‌شدند ولی باندل نبودند!) · qa_all 52 · elite47 4/4 · stage47_elites.gif+montage
@@ -66,7 +70,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 ## 🎮 پروژه‌ی HD-2D (Octopath-like) — نقشه‌ی فازها
 - قاعده‌ی طلایی: **هر نوبت فقط فاز درخواستی** · سقف ۲۸۰ خط/فایل · بیلد تک‌فایل `game.html` · بوت‌تست jsdom بعد از هر بیلد · مسیر CPU فعلی **fallback** بماند (سیو/منطق/نقشه دست‌نخورده) · هر افکت ۲ سطح کیفیت با `Q.level` · بودجه‌ی فریم ۸ms (تخمینی برای موبایل میان‌رده)
 - ✅ **فاز ۰ (ن۵۰)**: ممیزی + پایه — انجام شد؛ نمره ۱۳/۷۰ (≈۱٫۹/۱۰)؛ جزئیات `PHASE0.md`
-- فاز ۱ رندرر GPU + دوربین diorama (batcher WebGL2، آطلس، زمین پرسپکتیو، billboard، زیرپیکسل، فیلتر تمیز)
+- ✅ **فاز ۱ (ن۵۱)**: رندرر GPU + دوربین دیوراما — انجام شد؛ نمره ۱۷/۷۰؛ جزئیات `PHASE1.md` (مسیر CPU هنوز fallback کامل است)
 - فاز ۲ نور (normal رویه‌ای، نور نقطه‌ای دینامیک، سایه‌ی نرم، AO، emissive، چرخه‌ی روز/شب)
 - فاز ۳ پست‌پروسس (bloom، tilt-shift DOF، LUT تم‌ها، وینیت، god-rays، مه، فورگراند تار)
 - فاز ۴ تایل‌ست ۲× (۳۲px آرت برای تایل ۱۶ منطقی، چندلایه نویز، ۴۷-blob، پراکندگی، اشیای ارتفاع‌دار)
@@ -83,6 +87,7 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 - **صدا**: sine/triangle فقط · voice≤0.3 · ≤900Hz · one-shot≤1.5ث · unlock اولین لمس · mute در سیو
 - **آرامش بصری**: تغییر پیکسل/فریم — روز <۰٫۱٪ · باران ≤۳٪ · دانجن محیطی <۰٫۱٪ (موب=گیم‌پلی معاف) · ۴۵ فریم گرم‌کردن
 - **پرفورمنس**: روز ۰٫۶۰ms@480×320 · موبایل ۰٫۲۶ · دانجن ~۱٫۳ · نشتی صفر · بنچ ±۴۰٪ نویز — فقط میانه/هم‌پروسه
+- **قلاب‌های تست فاز ۱**: `__glOK` · `__glDiag()` (ok/gl2/glErr/quads/draws/lights/bakes/cam/view/scale/ms) · `__glCam` · `__glInv(lx,ly)`/`__glProj(x,y,out)` · `__glRas()` (فریم زمین) · `__glBakes()` · `__glCapture()`+`__glPng()` (عکس داخل تسک رسم) · `__glProbe()` (یونیفرم‌های واقعی) · پارامترها: `?cpu=1` مسیر CPU، `?gldbg=1` پنل دیباگ (یا کلید G)
 - **سیو**: فارم `{i,k,w,wt,c}` + درخت `{i,k:'tree',ad}` · stats.playT روز سیب · v6
 
 ## 🐛 درس‌های همیشگی
@@ -126,6 +131,14 @@ farm-and-dungeon/farm-dungeon/   (ریشه‌ی ریپو = پوشه‌ی وال�
 38. rAF هدلس با SwiftShader ≈ ۲۴ms کف محیط است (present نرم‌افزاری ۷۸۰×۱۶۸۸) — **شاهد GPU نیست**؛ فقط بنچ CPU معتبر است (ن۵۰)
 39. Playwright و باینری‌هایش در `.cache`/`node_modules` هستند = **در snapshot ذخیره نمی‌شوند** → هر سشن نصب مجدد (npm i playwright + install-deps + install chromium)؛ توکن/remote گیت هم چون در `.git/config` است حفظ نمی‌شود (ن۵۰)
 40. مدل نور دوگانه است (LUT ضربی شب در مزرعه · استمپ شعاعی در دانجن) — فاز ۲ باید یکی‌شان کند و مسیر قدیم fallback بماند (ن۵۰)
+
+41. `render(r)` در game/run **فقط `r` را فوروارد می‌کند** — آرگومان دوم بی‌صدا می‌افتد (ن۵۱: flatOnly)؛ فلگ را روی خودِ رستر بگذار
+42. یک بوم فقط **یک** نوع context می‌گیرد → اول `getContext('webgl2')`، 2d فقط در fallback؛ `toDataURL` بوم بدون preserveDrawingBuffer بیرون از تسک رسم خالی است → `gl.readPixels` داخل همان فریم
+43. شیدر: UV تکسچر باید بر **اندازه‌ی تکسچر** تقسیم شود نه زیرتصویر (u_org/tsize≠UV)؛ مقیاس اسپرایت با `u_ax.y` (ایستاده) نه `u_ax.x`؛ `uniform2f` با Float32Array → TypeError (باید uniform2fv)؛ WebGL2 بلوک `uniform vec2 a, b;` را قبول می‌کند ولی هم‌نام‌گذاری با پارامتر تابع را نه
+44. بنچ را از readback/اسکرین‌شات جدا کن (capture فریم را می‌کشد؛ ema را روی پنجره‌ی آرام بخوان)؛ bake اول هر تم یک بار گران است، نه per-frame
+
+45. افت کانتکست WebGL روی بومی که خودش WebGL دارد = **بنیان**؛ بوم WebGL باید بوم جدا باشد تا CPU زیرش زنده بماند؛ `restoreContext` ممکن است هیچ رخدادی ندهد → تلاش دوره‌ای `glInit` (ن۵۱)
+46. تست گیم‌پلی واقعی: `__cmd(tx,ty)` = همان مسیر تپ؛ راه‌رفتن واقعی ~۵ث طول می‌کشد → `waitForFunction` روی شرط، نه `setTimeout` (ن۵۱)
 
 ## ⚠️ قواعد ثابت کاربر
 - هیچ فایل خارجی (عکس/فونت/صدا) — همه Canvas 2D، پیکسل‌آرت، بدون AA، Math.round، کش یک‌بار، مقیاس صحیح

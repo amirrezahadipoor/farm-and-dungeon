@@ -16,10 +16,35 @@ import { isRaining } from './art/weather.js';
 import { questLabel } from './quests.js';
 import { initAppUI } from './app_ui.js';
 import { initScenes } from './main_scene.js';
+import { GLR, glInit, glResize, glReadback, GLT } from './art/gl.js';
+import { glScene, glInv, glProj, GCAM, GSTAT, glGroundRas } from './render_gl.js';
+import { glBakeCount, glAtlas } from './art/glbake.js';
 
 const canvas = document.getElementById('game');
+// ---------- فاز ۱ HD-2D: مسیر GPU ----------
+// یک بوم فقط یک نوع context می‌گیرد → #game همیشه 2D می‌ماند (مسیر CPU = fallback کامل، حتی اگر
+// وسط بازی کانتکست WebGL2 بیفتد) و WebGL2 روی بومِ شفافِ دوم (#glLayer) بالای آن رندر می‌شود.
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+let glCv = null, GLon = false;
+function bootGL() {
+  const c = document.createElement('canvas');
+  c.id = 'glLayer';
+  c.style.cssText = 'position:fixed;inset:0;display:block;image-rendering:pixelated;touch-action:none;pointer-events:none;z-index:2';
+  document.body.appendChild(c);
+  if (!glInit(c)) { c.remove(); return false; }
+  glCv = c;
+  return true;
+}
+if (!/[?&]cpu/.test(location.search)) GLon = bootGL();
+window.__glOK = GLon;
+function glShow(v) { if (glCv) glCv.style.display = v ? 'block' : 'none'; } // افت کانتکست → مخفی کن
+const _dbg = document.createElement('div');
+_dbg.id = 'gldbg';
+_dbg.style.cssText = 'position:fixed;top:6px;inset-inline-start:6px;z-index:70;font:11px ui-monospace,monospace;color:#aef;background:#000a;padding:4px 7px;border-radius:6px;white-space:pre;display:none;pointer-events:none;direction:ltr';
+document.body.appendChild(_dbg);
+addEventListener('keydown', (e) => { if (e.code === 'KeyG') _dbg.style.display = _dbg.style.display === 'none' ? 'block' : 'none'; });
+if (/[?&]gldbg/.test(location.search)) _dbg.style.display = 'block';
 
 // ---------- اپ + صحنه‌ها ----------
 const app = new App(loadSave());
@@ -59,6 +84,11 @@ function resize() {
   sc = new Raster(vw, vh, offImg.data); // صفر-کپی: رندر مستقیم داخل ImageData
   off.width = vw; off.height = vh;
   ctx.imageSmoothingEnabled = false;
+  if (glCv) { // بوم GPU هم‌اندازه‌ی #game
+    glCv.width = canvas.width; glCv.height = canvas.height;
+    glCv.style.width = innerWidth + 'px'; glCv.style.height = innerHeight + 'px';
+    glResize(glCv.width, glCv.height);
+  }
 }
 addEventListener('resize', resize);
 resize();
@@ -99,7 +129,7 @@ farmScene.onEvent = (k, n) => { // مأموریت‌ها: برداشت/فروش/
 };
 
 // ---------- حلقه ----------
-let last = performance.now(), fps = 0, fpsT = 0, fpsN = 0, _szChk = 0;
+let last = performance.now(), fps = 0, fpsT = 0, fpsN = 0, _szChk = 0, _glTry = 0;
 let _ambScene = '', _ambRain = false; // آمبینت جاری
 function loop(now) {
   const tA = performance.now(); // هزینه‌ی کار این فریم (بدون انتظار rAF)
@@ -138,8 +168,16 @@ function loop(now) {
       }
     }
   }
-  CAM.scale = scale; CAM.camX = Math.round(scene === 'farm' ? farmScene.cam.x : run.cam.x); CAM.camY = Math.round(scene === 'farm' ? farmScene.cam.y : run.cam.y);
-  canvas._cam = CAM;
+  CAM.scale = scale; // پیکسل دستگاه به‌ازای هر پیکسل نما (هر دو مسیر) — ورودی از این تقسیم می‌کند
+  CAM.inv = GLon ? glInv : null; // مسیر GPU: معکوس دقیق دوربین پرسپکتیو (ورودی لمسی/درگ)
+  if (GLon) { // مبدأ معادلِ پای قهرمان در فضای نما (پشتوانه‌ی خطی، اگر inv نبود)
+    CAM.camX = Math.round(GCAM.cx - 0.5 * sc.w / GCAM.A);
+    CAM.camY = Math.round(GCAM.cy - 0.5 * sc.h / (GCAM.S * GCAM.A));
+  } else {
+    CAM.camX = Math.round(scene === 'farm' ? farmScene.cam.x : run.cam.x);
+    CAM.camY = Math.round(scene === 'farm' ? farmScene.cam.y : run.cam.y);
+  }
+  canvas._cam = CAM; // ورودی همیشه روی #game (بوم GL شفاف و pointer-events:none است)
   if (scene === 'dungeon' && run && run.dungeon.shrine) { // محراب: نزدیک = باز، دور = بسته
     const sh = run.dungeon.shrine;
     const dsh = Math.hypot(run.hero.x - sh.x, run.hero.y - sh.y);
@@ -157,16 +195,38 @@ function loop(now) {
     const raining = scene === 'farm' && isRaining(farmScene.dayT);
     if (raining !== _ambRain) { _ambRain = raining; setRain(raining); }
   }
-  (scene === 'farm' ? farmScene : run).render(sc);
-  if (Q.level && scene === 'dungeon') vignette(sc.w, sc.h).apply(sc); // وینیت فقط دانجن — مزرعه روشن و تمیز (ن۳۶: سیاهیِ گوشه‌ها حذف شد)
-  S.applyFade(sc, dt);
-  offCtx.putImageData(offImg, 0, 0); // sc.d همان offImg.data است — بدون کپی ۶۰۰KB!
-  ctx.drawImage(off, 0, 0, sc.w, sc.h, 0, 0, sc.w * scale, sc.h * scale);
-  if (sc.h * scale < canvas.height) { // ن۴۰: باندِ زیر داک (نما کوتاه‌تر از بوم) — پاک تا فریم کهنه نماند
-    ctx.fillStyle = '#141124';
-    ctx.fillRect(0, sc.h * scale, canvas.width, canvas.height - sc.h * scale);
+  if (GLon !== GLR.ok) { // افت کانتکست WebGL2 (موبایل) → CPU؛ بازگشت → دوباره GPU
+    GLon = GLR.ok; glShow(GLon); window.__glOK = GLon;
+    if (GLon) resize();
+  }
+  // تلاش دوره‌ای برای احیا: بعضی مرورگرها رخداد webglcontextrestored را نمی‌دهند (headless/SwiftShader)
+  if (!GLon && glCv && _emaMs >= 0 && now - _glTry > 2000) {
+    _glTry = now;
+    if (glInit(glCv)) { GLon = true; glShow(true); window.__glOK = true; resize(); }
+  }
+  const g0 = scene === 'farm' ? farmScene : run;
+  if (GLon) { // مسیر GPU: زمین شیب‌دار + billboard + نور/تینت/محو در شیدر
+    glScene(scene === 'farm' ? 'farm' : 'dungeon', farmScene, run, sc.w, sc.h, scale, S.getFade(), Q.level && scene !== 'farm' ? 1 : 0);
+    S.applyFade(sc, dt); // فقط پیشبرد وضعیت گذار مشکی (تصویر GPU جداست)
+    if (window.__glCap) { window.__glCap = 0; window.__glShot = shotURL(); }
+  } else {
+    g0.render(sc);
+    if (Q.level && scene === 'dungeon') vignette(sc.w, sc.h).apply(sc); // وینیت فقط دانجن — مزرعه روشن و تمیز (ن۳۶: سیاهیِ گوشه‌ها حذف شد)
+    S.applyFade(sc, dt);
+    offCtx.putImageData(offImg, 0, 0); // sc.d همان offImg.data است — بدون کپی ۶۰۰KB!
+    ctx.drawImage(off, 0, 0, sc.w, sc.h, 0, 0, sc.w * scale, sc.h * scale);
+    if (sc.h * scale < canvas.height) { // ن۴۰: باندِ زیر داک (نما کوتاه‌تر از بوم) — پاک تا فریم کهنه نماند
+      ctx.fillStyle = '#141124';
+      ctx.fillRect(0, sc.h * scale, canvas.width, canvas.height - sc.h * scale);
+    }
   }
   UI.refreshHud(false);
+  if (_dbg.style.display !== 'none') {
+    _dbg.textContent = (GLon ? 'GL2 ' + GSTAT.quads + 'q ' + GSTAT.draws + 'd ' + GSTAT.lights + 'L' : 'CPU') +
+      '\nf ' + _emaMs.toFixed(1) + 'ms ' + (scene === 'farm' ? 'farm' : 'dun ' + run.floor) +
+      '\ncam ' + GCAM.cx.toFixed(1) + ',' + GCAM.cy.toFixed(1) + ' A' + GCAM.A + ' S' + GCAM.S + ' B' + GCAM.B +
+      '\nbakes ' + glBakeCount() + ' atlas ' + GLT.cw + 'x' + GLT.ch;
+  }
   fpsN++; fpsT += dt;
   if (fpsT >= 0.5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; $('fps').textContent = `${faNum(fps)} ${t('fps')}`; }
   // ---- کیفیت تطبیقی: اگر کارِ فریم به‌طور پیوسته گران بود، افکت‌های غیرضروری خاموش شوند ----
@@ -185,6 +245,28 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// ---------- قلاب‌های تست (Playwright): عکس مسیر GPU داخل تسک رسم ----------
+function shotURL() {
+  const rb = glReadback();
+  const c = document.createElement('canvas');
+  c.width = rb.w; c.height = rb.h;
+  const c2 = c.getContext('2d');
+  const im = c2.createImageData(rb.w, rb.h);
+  im.data.set(rb.d);
+  c2.putImageData(im, 0, 0);
+  return c.toDataURL('image/png');
+}
+window.__cmd = (x, y) => farmScene.command(x * TILE + 8, y * TILE + 8); window.__glRas = glGroundRas; window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
+window.__glBakes = glBakeCount; window.__glCapture = () => { window.__glCap = 1; return true; };
+window.__glPng = () => window.__glShot || '';
+window.__glRest = () => ({ restores: GLR.restores, ok2: GLR.ok2, ok: GLR.ok, progs: !!GLR.progs, h: typeof (glCv && glCv.onwebglcontextrestored) });
+window.__glProbe = () => { // مقادیر واقعی یونیفرم‌های برنامه‌ی زمین (اشکال‌زدایی)
+  const gl = GLR.gl; if (!gl || !GLR.progs) return null;
+  const pr = GLR.progs.g, g2 = (n) => { const v = gl.getUniform(pr.p, gl.getUniformLocation(pr.p, n)); return v && v.length ? Array.from(v) : v; };
+  return { ax: g2('u_ax'), cam: g2('u_cam'), org: g2('u_org'), tsz: g2('u_tsize'), view: g2('u_view'), vp: g2('u_vp'), scale: g2('u_scale'), persp: g2('u_persp'), uscale: GLR.uscale };
+};
+window.__glDiag = () => ({ ok: GLon, gl2: !!(GLR.gl && GLR.ok), glErr: GLR.gl ? GLR.gl.getError() : -1, ok2: GLR.ok, quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, bakes: glBakeCount(), cam: [GCAM.cx, GCAM.cy, GCAM.A, GCAM.S, GCAM.B], view: [sc && sc.w, sc && sc.h], scale, ms: _emaMs });
 
 // ---------- ذخیره‌ی دوره‌ای ----------
 setInterval(saveNow, 3000);

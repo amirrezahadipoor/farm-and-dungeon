@@ -73,6 +73,7 @@ function blitRegion(dst, src, sx0, sy0, w, h) {
 
 // رندر کامل صحنه‌ی دانجن در Raster
 export function renderRun(run, r) {
+    const flat = !!r.flatOnly; // فاز ۱ HD-2D: فریم زمین برای مسیر GPU — بدون تاریکی/موجودات/افکت‌ها
     const D = run.dungeon, h = run.hero;
     const [shx, shy] = run.fx.offset(run.time);
     let cx = clamp(Math.round(run.cam.x) + shx, 0, WORLD_W - r.w);
@@ -100,6 +101,7 @@ export function renderRun(run, r) {
     drawTorches(r, D, cx, cy, run.time);
     drawChests(r, D, cx, cy, run.time);
     drawShrines(r, D, cx, cy, run.time);
+    if (flat) drawDrops(r, D, cx, cy); // قطره‌ها روی زمین (زیر موجودات) — در مسیر CPU بعد از موجودات بود
     // هاله‌ی تهدید باس (نبض قرمز زیر پا)
     const bossRef = D.enemies.find((e) => e.isBoss) || null; // یک find برای هاله + مینی‌مپ
     if (bossRef && bossRef.state !== 'die') r.ellipse(Math.round(bossRef.x) - cx, Math.round(bossRef.y) + 2 - cy, 26 + Math.round(Math.sin(run.time * 3) * 3), 8, [190, 60, 60, 42]);
@@ -109,7 +111,7 @@ export function renderRun(run, r) {
       r.ellipse(Math.round(g.x) - cx, Math.round(g.y) - 14 - cy, 7 - g.t * 12, 12 - g.t * 20, [140, 220, 255, Math.max(0, a)]);
     }
     // ن۴۱: اسپلش ورود طبقه — فونت دوزبانه‌ی بزرگ، محو ۲٫۲ث (روی تاریکی می‌افتد تا خوانا بماند)
-    if (run._splash) {
+    if (!flat && run._splash) {
       const k = run.time - run._splash.t0;
       if (k < 0 || k > 2.2 || !isFinite(k)) run._splash = null;
       else {
@@ -121,6 +123,7 @@ export function renderRun(run, r) {
         }
       }
     }
+    if (!flat) {
     // pool رپرها — بدون تخصیص آبجکت در هر فریم
     let ne = 0;
     for (const e of D.enemies) if (!e.dead) {
@@ -158,8 +161,10 @@ export function renderRun(run, r) {
     drawDrops(r, D, cx, cy);
     if (run.hero.skillT > 0) r.ellipse(Math.round(h.x - cx), Math.round(h.y - 12 - cy), 40, 18, SKILL_HALO);
     if (run.hero.iframe > 0 && Math.floor(run.time * 16) % 2 === 0) r.ellipse(Math.round(h.x - cx), Math.round(h.y - 12 - cy), 14, 22, IFRAME_GLOW);
+    }
 
     // ---- تاریکی + منابع نور (آرت جدا در art/light.js) ----
+    if (!flat) {
     if (!run._dark || run._dark.w !== r.w || run._dark.h !== r.h) run._dark = new Raster(r.w, r.h);
     const L = _lights; L.length = 0;
     L.push(h.x - cx, h.y - 14 - cy, 78, 195); // دید باز — نه ذربین!
@@ -219,4 +224,5 @@ export function renderRun(run, r) {
     const hx = Math.floor(h.x / TILE), hy = Math.floor(h.y / TILE);
     if (Math.floor(run.time * 4) % 2 === 0) r.rect(mx + hx * s, my + hy * s, 2, 2, [255, 255, 255, 255]);
     if (bossRef) r.px(mx + Math.floor(bossRef.x / TILE) * s, my + Math.floor(bossRef.y / TILE) * s, BOSS_DOT);
+    }
   }

@@ -1,0 +1,122 @@
+{
+ "farm_day": {
+  "cpu": {
+   "colors": 943,
+   "meanL": 90.7,
+   "dark%": 17.8,
+   "bright%": 0.2,
+   "sat": 122.1,
+   "flat16": 0.897,
+   "period_top": 8,
+   "period_mid": 20,
+   "period_bot": 16
+  },
+  "gl": {
+   "colors": 153,
+   "meanL": 92.0,
+   "dark%": 17.4,
+   "bright%": 0.0,
+   "sat": 123.3,
+   "flat16": 0.899,
+   "period_top": 8,
+   "period_mid": 5,
+   "period_bot": 5
+  }
+ },
+ "farm_night": {
+  "cpu": {
+   "colors": 933,
+   "meanL": 57.0,
+   "dark%": 23.2,
+   "bright%": 0.2,
+   "sat": 132.0,
+   "flat16": 0.897,
+   "period_top": 8,
+   "period_mid": 24,
+   "period_bot": 16
+  },
+  "gl": {
+   "colors": 147,
+   "meanL": 54.7,
+   "dark%": 24.1,
+   "bright%": 0.0,
+   "sat": 134.0,
+   "flat16": 0.899,
+   "period_top": 8,
+   "period_mid": 5,
+   "period_bot": 5
+  }
+ },
+ "farm_rain": {
+  "cpu": {
+   "colors": 1045,
+   "meanL": 79.4,
+   "dark%": 17.8,
+   "bright%": 0.2,
+   "sat": 124.9,
+   "flat16": 0.895,
+   "period_top": 8,
+   "period_mid": 24,
+   "period_bot": 16
+  },
+  "gl": {
+   "colors": 163,
+   "meanL": 79.6,
+   "dark%": 17.4,
+   "bright%": 0.0,
+   "sat": 125.9,
+   "flat16": 0.898,
+   "period_top": 8,
+   "period_mid": 5,
+   "period_bot": 5
+  }
+ },
+ "dungeon": {
+  "cpu": {
+   "colors": 1231,
+   "meanL": 53.3,
+   "dark%": 29.4,
+   "bright%": 0.5,
+   "sat": 87.9,
+   "flat16": 0.606,
+   "period_top": 8,
+   "period_mid": 16,
+   "period_bot": 32
+  },
+  "gl": {
+   "colors": 338,
+   "meanL": 49.8,
+   "dark%": 27.3,
+   "bright%": 0.5,
+   "sat": 96.6,
+   "flat16": 0.707,
+   "period_top": 9,
+   "period_mid": 5,
+   "period_bot": 15
+  }
+ },
+ "battle": {
+  "cpu": {
+   "colors": 1067,
+   "meanL": 53.2,
+   "dark%": 30.3,
+   "bright%": 0.3,
+   "sat": 87.2,
+   "flat16": 0.609,
+   "period_top": 32,
+   "period_mid": 16,
+   "period_bot": 32
+  },
+  "gl": {
+   "colors": 468,
+   "meanL": 54.8,
+   "dark%": 26.8,
+   "bright%": 1.2,
+   "sat": 96.2,
+   "flat16": 0.679,
+   "period_top": 9,
+   "period_mid": 9,
+   "period_bot": 5
+  }
+ }
+}

@@ -1,0 +1,61 @@
+{
+ "farm": {
+  "pick": {
+   "x": 6,
+   "y": 6
+  },
+  "tilled": true,
+  "planted": true,
+  "soils": 1,
+  "crops": 1,
+  "movedPx": 238,
+  "rainQuads": 18,
+  "nightQuads": 19,
+  "errs": [],
+  "ok": true
+ },
+ "dungeon": {
+  "start": {
+   "hp": 100,
+   "floor": 1,
+   "pos": [
+    440,
+    40
+   ]
+  },
+  "afterSkill": {
+   "floor": 2
+  },
+  "end": {
+   "floor": 2,
+   "hp": 100,
+   "quads": 10,
+   "draws": 3,
+   "lights": 4
+  },
+  "errs": [],
+  "ok": true
+ },
+ "ctxLoss": {
+  "lost": "lost",
+  "before": {
+   "quads": 14,
+   "draws": 2
+  },
+  "during": {
+   "glOK": false,
+   "quads": 14,
+   "time": 2.3
+  },
+  "after": {
+   "glOK": true,
+   "quads": 14,
+   "draws": 2,
+   "bakes": 12,
+   "glErr": 0
+  },
+  "errs": [],
+  "ok": true
+ },
+ "ok": true
+}

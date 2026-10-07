@@ -1,0 +1,173 @@
+{
+ "url": "http://localhost:8080/game.html?cpu=1",
+ "errs": [],
+ "shots": [
+  "p1c_farm_day_dom.png",
+  "p1c_farm_night_dom.png",
+  "p1c_farm_rain_dom.png",
+  "p1c_dungeon_dom.png",
+  "p1c_battle_dom.png"
+ ],
+ "diag": [
+  {
+   "tag": "farm_day",
+   "ok": false,
+   "gl2": false,
+   "glErr": -1,
+   "ok2": false,
+   "quads": 0,
+   "draws": 0,
+   "lights": 0,
+   "bakes": 0,
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594,
+    0.0006
+   ],
+   "view": [
+    195,
+    349
+   ],
+   "scale": 4,
+   "ms": 0.3318778914407336,
+   "pngBytes": 0
+  },
+  {
+   "tag": "farm_night",
+   "ok": false,
+   "gl2": false,
+   "glErr": -1,
+   "ok2": false,
+   "quads": 0,
+   "draws": 0,
+   "lights": 0,
+   "bakes": 0,
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594,
+    0.0006
+   ],
+   "view": [
+    195,
+    349
+   ],
+   "scale": 4,
+   "ms": 0.5045323617824018,
+   "pngBytes": 0
+  },
+  {
+   "tag": "farm_rain",
+   "ok": false,
+   "gl2": false,
+   "glErr": -1,
+   "ok2": false,
+   "quads": 0,
+   "draws": 0,
+   "lights": 0,
+   "bakes": 0,
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594,
+    0.0006
+   ],
+   "view": [
+    195,
+    349
+   ],
+   "scale": 4,
+   "ms": 0.480890416581666,
+   "pngBytes": 0
+  },
+  {
+   "tag": "dungeon",
+   "ok": false,
+   "gl2": false,
+   "glErr": -1,
+   "ok2": false,
+   "quads": 0,
+   "draws": 0,
+   "lights": 0,
+   "bakes": 0,
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594,
+    0.0006
+   ],
+   "view": [
+    195,
+    351
+   ],
+   "scale": 4,
+   "ms": 0.9519499374136791,
+   "pngBytes": 0
+  },
+  {
+   "tag": "battle",
+   "ok": false,
+   "gl2": false,
+   "glErr": -1,
+   "ok2": false,
+   "quads": 0,
+   "draws": 0,
+   "lights": 0,
+   "bakes": 0,
+   "cam": [
+    240,
+    160,
+    1.28,
+    0.8594,
+    0.0006
+   ],
+   "view": [
+    195,
+    351
+   ],
+   "scale": 4,
+   "ms": 1.0288358610361932,
+   "pngBytes": 0
+  }
+ ],
+ "battle": {
+  "kind": "bat",
+  "x": 86.00217043348046,
+  "y": 56.215865816095196,
+  "hp": 0
+ },
+ "fps": {
+  "median": 16.7,
+  "p90": 16.7,
+  "min": 16.5
+ },
+ "bakes": 0,
+ "end": {
+  "ok": false,
+  "gl2": false,
+  "glErr": -1,
+  "ok2": false,
+  "quads": 0,
+  "draws": 0,
+  "lights": 0,
+  "bakes": 0,
+  "cam": [
+   240,
+   160,
+   1.28,
+   0.8594,
+   0.0006
+  ],
+  "view": [
+   195,
+   351
+  ],
+  "scale": 4,
+  "ms": 0.9360230047878353
+ }
+}
