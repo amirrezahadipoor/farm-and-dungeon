@@ -35,6 +35,7 @@ export function glBatchInit() {
   GLT.ui = mkTex(gl, GLT.cw, GLT.ch);
   GLT.wx = mkTex(gl, GLT.cw, GLT.ch);
   LAY.pr = mkProg(gl, VS_LAY, FS_LAY);
+  GLT.ramp = /(^|[?&])noramp=1/.test(location.search) ? 0 : 1; // سوییچ QA برای سنجش رمپ
   GND.m16 = mesh(gl, 16); GND.m32 = mesh(gl, 32);
   SB.data = new Float32Array(MAXQ * 4 * VERT);
   SB.vao = gl.createVertexArray();
@@ -130,6 +131,9 @@ export function glLights(list, cols, n) {
   if (n) { GLT.lights.set(list.subarray(0, n * 4)); GLT.lightsC.set(cols.subarray(0, n * 4)); }
 }
 // خورشید/ماه + قدرت نرمال/AO
+export function glRim(x, y, k) { // جهت نور لبه (صفحه‌ای) + شدت
+  GLT.rim[0] = x; GLT.rim[1] = y; GLT.rim[2] = k;
+}
 export function glSun(dir, col, k) {
   GLT.sun[0] = dir[0]; GLT.sun[1] = dir[1]; GLT.sun[2] = dir[2];
   GLT.sunC[0] = col[0]; GLT.sunC[1] = col[1]; GLT.sunC[2] = col[2];
@@ -176,6 +180,8 @@ export function glFlushSprites() {
   const gl = GLR.gl, pr = GLR.progs.s;
   gl.useProgram(pr.p);
   bindCam(gl, pr);
+  gl.uniform3fv(uni(pr, 'u_rim'), GLT.rim);
+  gl.uniform1f(uni(pr, 'u_ramp'), GLT.ramp);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, GLT.atlas);
   gl.bindVertexArray(SB.vao);

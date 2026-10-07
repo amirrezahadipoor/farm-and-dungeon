@@ -20,7 +20,7 @@
    "floor": 1,
    "pos": [
     24,
-    152
+    24
    ]
   },
   "afterSkill": {
@@ -29,9 +29,9 @@
   "end": {
    "floor": 2,
    "hp": 100,
-   "quads": 22,
-   "draws": 5,
-   "lights": 3
+   "quads": 21,
+   "draws": 4,
+   "lights": 4
   },
   "errs": [],
   "ok": true

@@ -376,15 +376,27 @@ class Raster {
       for (let x = cx - dx; x <= cx + dx; x++) this.px(x, cy + dy, c);
     }
   }
-  // پاس outline: هر پیکسل شفافِ مجاور (۴همسایه) پیکسل بدنه → رنگ outline
+  // پاس outline: هر پیکسل شفافِ مجاور پیکسل بدنه → رنگ outline
+  // فاز ۳ (sel-out): رنگ از میانگین ۸همسایه‌ی بدنه گرفته می‌شود (تیره + شیفت سرد) نه یک رنگ ثابت
   outline(c) {
-    const mask = new Uint8Array(this.w * this.h);
-    for (let i = 0; i < this.w * this.h; i++) mask[i] = this.d[i * 4 + 3] > 200 ? 1 : 0;
-    for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) {
-      if (mask[y * this.w + x]) continue;
-      if ((x > 0 && mask[y * this.w + x - 1]) || (x < this.w - 1 && mask[y * this.w + x + 1]) ||
-          (y > 0 && mask[(y - 1) * this.w + x]) || (y < this.h - 1 && mask[(y + 1) * this.w + x]))
-        this.px(x, y, c);
+    const w = this.w, h = this.h, d = this.d, mask = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) mask[i] = d[i * 4 + 3] > 200 ? 1 : 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x;
+      if (mask[k]) continue;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const kk = yy * w + xx;
+        if (!mask[kk]) continue;
+        const j = kk * 4; r += d[j]; g += d[j + 1]; b += d[j + 2]; n++;
+      }
+      if (!n) continue;
+      let rr = (r / n) * 0.15 + c[0] * 0.5, gg = (g / n) * 0.15 + c[1] * 0.5, bb = (b / n) * 0.19 + c[2] * 0.5;
+      const L = 0.299 * rr + 0.587 * gg + 0.114 * bb; // سقف روشنایی: outline باید تیره بماند
+      if (L > 58) { const sc = 58 / L; rr *= sc; gg *= sc; bb *= sc; }
+      this.px(x, y, [rr | 0, gg | 0, bb | 0, c[3]]);
     }
   }
   // یک‌بار اسکن: اگر تمام پیکسل‌ها مات‌اند، over مسیر کپیِ ردیفی فوق‌سریع می‌گیرد
@@ -463,6 +475,7 @@ const GLT = {
   ground: 0, atlas: 0, ui: 0, wx: 0, cw: 512, ch: 384, n: 0,
   lights: new Float32Array(MAXL * 4), lightsC: new Float32Array(MAXL * 4),
   sun: new Float32Array([0.25, -0.6, 0.9]), sunC: new Float32Array([1, 0.96, 0.9, 0.4]), relief: 1,
+  rim: new Float32Array([0.7, -0.7, 0.3]), ramp: 1, // نور لبه + سوییچ رمپ (فاز ۳)
   dark: new Float32Array([13 / 255, 11 / 255, 26 / 255]),
 };
 
@@ -591,6 +604,8 @@ void main() {
 const FS_SPR = `#version 300 es
 precision mediump float;
 uniform sampler2D u_tex;
+uniform vec3 u_rim; // فاز ۳: نور لبه — xy جهت صفحه، z شدت
+uniform float u_ramp; // فاز ۳: ۱ = رمپ ۵پله‌ی هیو-شیفت، ۰ = سایه‌زنی نرم فاز ۲ (سوییچ A/B برای QA)
 in vec2 v_uv, v_sc, v_r01;
 in vec4 v_col;
 flat in float v_mode;
@@ -608,7 +623,19 @@ void main() {
   } else {                                       // روبه‌دوربین: نرمال رو به بالا-جلو
     vec3 n = normalize(vec3(0.0, -0.42, 1.0));
     float top = 1.0 - 0.10 * v_r01.y;
-    col = (c.rgb * (ambientAt(v_sc) + lightSum(v_sc, n)) + c.rgb * sunAt(n) * 0.8) * top;
+    vec3 shade = ambientAt(v_sc) + lightSum(v_sc, n) + sunAt(n) * 0.8;
+    // رمپ ۵ پله‌ی هیو-شیفت (فاز ۳): سایه سرد، هایلایت گرم — هیوی نورِ رنگی حفظ می‌شود
+    float li = max(luma3(shade), 0.001), q = clamp(li, 0.0, 1.45);
+    float lv = mix(clamp(q, 0.0, 1.0), clamp(floor(q * 2.9 + 0.02), 0.0, 4.0) * 0.25, u_ramp);
+    vec3 tint = mix(vec3(1.0), mix(vec3(0.72, 0.82, 1.24), vec3(1.18, 1.05, 0.82), lv), u_ramp);
+    col = c.rgb * (shade / li) * (0.34 + 0.92 * lv) * tint * top;
+    if (u_rim.z > 0.01) {                        // نور لبه: فقط مرزِ سمتِ نور (از کانال آلفا)
+      vec2 px = fwidth(v_r01), rd = u_rim.xy;
+      float aN = texture(u_tex, v_uv - rd * px * 1.4).a, aF = texture(u_tex, v_uv + rd * px * 1.4).a;
+      float e = (aN < 0.4 && aF > 0.55) ? 1.0 : 0.0;
+      e += texture(u_tex, v_uv - vec2(0.0, px.y * 1.4)).a < 0.4 ? 0.35 : 0.0;
+      col += mix(c.rgb, vec3(1.0, 0.98, 0.9), 0.45) * e * u_rim.z;
+    }
   }
   o = vec4(mix(col, vec3(1.0), u_flash), c.a);
 }`;
@@ -756,6 +783,7 @@ function glBatchInit() {
   GLT.ui = mkTex(gl, GLT.cw, GLT.ch);
   GLT.wx = mkTex(gl, GLT.cw, GLT.ch);
   LAY.pr = mkProg(gl, VS_LAY, FS_LAY);
+  GLT.ramp = /(^|[?&])noramp=1/.test(location.search) ? 0 : 1; // سوییچ QA برای سنجش رمپ
   GND.m16 = mesh(gl, 16); GND.m32 = mesh(gl, 32);
   SB.data = new Float32Array(MAXQ * 4 * VERT);
   SB.vao = gl.createVertexArray();
@@ -851,6 +879,9 @@ function glLights(list, cols, n) {
   if (n) { GLT.lights.set(list.subarray(0, n * 4)); GLT.lightsC.set(cols.subarray(0, n * 4)); }
 }
 // خورشید/ماه + قدرت نرمال/AO
+function glRim(x, y, k) { // جهت نور لبه (صفحه‌ای) + شدت
+  GLT.rim[0] = x; GLT.rim[1] = y; GLT.rim[2] = k;
+}
 function glSun(dir, col, k) {
   GLT.sun[0] = dir[0]; GLT.sun[1] = dir[1]; GLT.sun[2] = dir[2];
   GLT.sunC[0] = col[0]; GLT.sunC[1] = col[1]; GLT.sunC[2] = col[2];
@@ -897,6 +928,8 @@ function glFlushSprites() {
   const gl = GLR.gl, pr = GLR.progs.s;
   gl.useProgram(pr.p);
   bindCam(gl, pr);
+  gl.uniform3fv(uni(pr, 'u_rim'), GLT.rim);
+  gl.uniform1f(uni(pr, 'u_ramp'), GLT.ramp);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, GLT.atlas);
   gl.bindVertexArray(SB.vao);
@@ -917,9 +950,9 @@ function glOverlay(fade, vig) {
   gl.bindVertexArray(null);
 }
 
-return {GLAT, glBatchInit, glUi, glWx, glLayer, glAtlas, glGround, glPush, glCam, glLights, glSun, glFrame, glFlushSprites, glOverlay};
+return {GLAT, glBatchInit, glUi, glWx, glLayer, glAtlas, glGround, glPush, glCam, glLights, glRim, glSun, glFrame, glFlushSprites, glOverlay};
 })();
-const {GLAT, glBatchInit, glUi, glWx, glLayer, glAtlas, glGround, glPush, glCam, glLights, glSun, glFrame, glFlushSprites, glOverlay} = __m_art_gl_batch;
+const {GLAT, glBatchInit, glUi, glWx, glLayer, glAtlas, glGround, glPush, glCam, glLights, glRim, glSun, glFrame, glFlushSprites, glOverlay} = __m_art_gl_batch;
 const __m_art_palette_hero = (() => {
 // art/palette_hero.js — پالت ثابت ۲۴ رنگه‌ی قهرمان/کارگر (از ریشه به art/ منتقل شد) (بدون هیچ رنگ محاسبه‌شده‌ی خارج از پالت)
 const PAL = {
@@ -8729,7 +8762,7 @@ function pushDecal(w, h, k, wx, wy, objH, sc) {
   if (!d) d = DEC[dn] = {};
   d.rec = t; d.ax = x; d.ay = y; d.col = W4; dn++;
 }
-let dnStat = 0;
+let dnStat = 0, scene_gl_farm = true;
 // حوضه‌ی نور روی زمین (کارت lightmap، بدون نورپردازی مجدد — mode 3)
 function pushPool(kind, cx, cy, r, peak) {
   if (dn >= 90) return;
@@ -8787,7 +8820,6 @@ function cycle(dayT, raining) {
   shX = (-sx / n2) * len; shY = (-sy / n2) * len * (GCAM.S * GCAM.A) / GCAM.A;
   return gold;
 }
-let scene_gl_farm = true;
 function glTintDungeon() { GR.tint[0] = 1; GR.tint[1] = 1; GR.tint[2] = 1; GR.tint[3] = 142; } // تاریکی محیط عمیق (فاز ۲)
 // ---------- مزرعه ----------
 const HOUSE_WIN = [1, 0.76, 0.42];
@@ -8800,7 +8832,7 @@ function farmEnts(game, t, night, x0, y0, x1, y1) {
     if (!c) continue;
     if (c.kind === 'tree') {
       const v = c.variant & 1;
-      pushDecal(22, 13, 0.55, tx * TILE + 8, ty * TILE + 13, 14, 1);
+      pushDecal(22, 13, 0.55, tx * TILE + 8, ty * TILE + 13, 14, 1); // سایه‌ی تماس
       pushE(BK.tree(v, Math.round(Math.sin(t * 0.85 + tx * 0.9 + v * 2.1))), tx * TILE, ty * TILE, 8, 18, W4, 0, ty * TILE + TILE);
     } else if (c.kind === 'sign') { pushDecal(13, 8, 0.5, tx * TILE + 8, ty * TILE + 14, 5, 1); pushE(BK.sign(), tx * TILE, ty * TILE, 2, 4, W4, 0, ty * TILE + TILE); }
     else if (c.kind === 'scarecrow') { pushDecal(15, 9, 0.5, tx * TILE + 8, ty * TILE + 14, 9, 1); pushE(BK.scare(Math.floor(t * 1.4) & 1), tx * TILE, ty * TILE, 2, 4, W4, 0, ty * TILE + TILE); }
@@ -8850,6 +8882,12 @@ function runEnts(run, t, x0, y0, x1, y1) {
     pushE(textRec(txt, [230, 199, 74, 255], 'cb', 1), h.x - w * 0.5, h.y - 58, 2, 2, W4, 0, TOPY - 6);
   }
 }
+function rimRun(cx, cy) { // جهت نور لبه: از مرکز دوربین به‌سوی مرکز جرمِ نورهای صفحه‌ای
+  let dx = 0, dy = 0, s = 0;
+  for (let i = 0; i < GR.nl; i++) { const o = i * 4, w = GR.L[o + 3]; dx += (GR.L[o] - cx) * w; dy += (GR.L[o + 1] - cy) * w; s += w; }
+  const m = Math.hypot(dx, dy) || 1, k = s > 0.05 ? (Q.level ? 0.30 * Math.min(1, s) : 0.14) : 0;
+  glRim(k ? dx / m : 0.7, k ? dy / m : -0.7, k);
+}
 function lightsRun(run, t) {
   const D = run.dungeon;
   pushPool(1, run.hero.x, run.hero.y - 4, 88, 0.36); // هاله‌ی قهرمان روی زمین
@@ -8864,11 +8902,9 @@ function lightsRun(run, t) {
 function fxLayer(g, w, h) {
   const fx = g.fx;
   if (!fx.parts.length && !fx.slashes.length && !fx.floats.length) { GR.fxn = 0; return; }
-  if (!GR.fx || GR.fx.w !== w || GR.fx.h !== h) GR.fx = new Raster(w, h);
-  else GR.fx.clear();
+  if (!GR.fx || GR.fx.w !== w || GR.fx.h !== h) GR.fx = new Raster(w, h); else GR.fx.clear();
   fx.render(GR.fx, GCAM.cx - GCAM.W * 0.5, GCAM.cy - GCAM.H * 0.5);
-  glUi(GR.fx, w, h);
-  GR.fxn = 1;
+  glUi(GR.fx, w, h); GR.fxn = 1;
 }
 function wxLayer(g, W, H) {
   if (!isRaining(g.dayT)) { GR.wxn = 0; return; }
@@ -8900,20 +8936,21 @@ function glScene(scene, farm, run, W, H, scale, fade, vig) {
   g.render(GR.ras);
   GR.ras.flatOnly = false; g.cam.x = ocx; g.cam.y = ocy; g.fx.shakeT = osh;
   glGround(GR.ras, gw, gh);
-  GR.nl = 0;
-  const t = g.time, rain = scene === 'farm' && isRaining(g.dayT);
-  GLT.relief = Q.level ? 1 : 0;
+  GR.nl = 0; const t = g.time, rain = scene === 'farm' && isRaining(g.dayT);
+  GLT.relief = Q.level ? 1 : 0; // گام پرسپکتیو/برجستگی فقط سطح کیفیت بالا
   if (scene === 'farm') {
-    cycle(g.dayT, rain);
+    cycle(g.dayT, rain); const sd = Math.hypot(shX, shY) || 1; // نور لبه از سمت خورشید (شب خفیف‌تر)
+    glRim(-shX / sd, -shY / sd, Q.level ? 0.30 * (0.45 + 0.55 * (1 - nightFactor(g.dayT))) : 0.12);
     GLR.flash = rain ? lightningK(g.dayT, t) * 0.26 : 0;
     farmEnts(g, t, nightFactor(g.dayT), x0, y0, x0 + gw, y0 + gh);
   } else {
     glSun([0, 0, 1], [0, 0, 0], 0); GSTAT.sun = [0, 0, 1, 0]; // داخل: خبری از خورشید نیست
     glTintDungeon(); GLR.flash = 0;
-    lightsRun(run, t); runEnts(run, t, x0, y0, x0 + gw, y0 + gh);
+    lightsRun(run, t); rimRun(cx, cy); // چراغ‌ها + جهت نور لبه
+    runEnts(run, t, x0, y0, x0 + gw, y0 + gh);
   }
-  GR.cam[0] = GCAM.cx; GR.cam[1] = GCAM.cy; GR.view[0] = W; GR.view[1] = H;
-  GR.ax[0] = GCAM.A; GR.ax[1] = sA; GR.org[0] = x0; GR.org[1] = y0; GR.tsz[0] = gw; GR.tsz[1] = gh;
+  GR.cam[0] = GCAM.cx; GR.cam[1] = GCAM.cy; GR.view[0] = W; GR.view[1] = H; GR.ax[0] = GCAM.A; GR.ax[1] = sA;
+  GR.org[0] = x0; GR.org[1] = y0; GR.tsz[0] = gw; GR.tsz[1] = gh;
   GLT.dark = GR.dark;
   glLights(GR.L, GR.LC, GR.nl);
   glFrame(GR.cam, GR.ax, GCAM.B, GR.view, GR.tint, GR.org, GR.tsz, Q.level ? 16 : 32);
@@ -8932,17 +8969,15 @@ function glScene(scene, farm, run, W, H, scale, fade, vig) {
 function uiDungeon(run, W, H, ox, oy) {
   const h = run.hero, sp = run._splash, k = sp ? run.time - sp.t0 : -1;
   let any = false;
-  if (sp && k >= 0 && k < 2.2) {
-    const al = Math.min(1, k / 0.25, (2.2 - k) / 0.45);
-    const txt = t('floor') + ' ' + faNum(sp.n) + (sp.boss ? ' — ' + t('bossFloor') : '');
+  if (sp && k >= 0 && k < 2.2) { // اسپلش طبقه (لایه‌ی UI مسیر GPU)
+    const al = Math.min(1, k / 0.25, (2.2 - k) / 0.45), txt = t('floor') + ' ' + faNum(sp.n) + (sp.boss ? ' — ' + t('bossFloor') : '');
     const sc = 2, w = textW(txt, sc), col = sp.boss ? [226, 120, 120, 255] : [255, 224, 130, 255];
     pushE(textRec(txt, col, sp.boss ? 'bs' : 'fl', sc), W * 0.5 - w * 0.5 - 2 * sc, 30 - 2 * sc, 0, 0, [1, 1, 1, al], 1, TOPY);
     any = true;
   }
   const mini = run._mini;
   if (mini) {
-    const hsx = Math.round(h.x) - ox, hsy = Math.round(h.y) - oy, my = 3;
-    const mx = hsx < COLS + 30 && hsy < ROWS + 30 ? W - COLS - 8 : 3;
+    const hsx = Math.round(h.x) - ox, hsy = Math.round(h.y) - oy, my = 3, mx = hsx < COLS + 30 && hsy < ROWS + 30 ? W - COLS - 8 : 3;
     pushE(minimapRec(run, mini, t('floor') + ' ' + faNum(run.floor), [230, 199, 74, 255]), mx, my, 0, 0, W4, 1, TOPY + 1);
     if (Math.floor(run.time * 4) % 2 === 0) pushE(BK.white(), mx + Math.floor(h.x / TILE), my + Math.floor(h.y / TILE), 0, 1, W4, 1, TOPY + 2);
     const b = run.dungeon.enemies.find((e) => e.isBoss && !e.dead);
@@ -9325,7 +9360,7 @@ function shotURL() {
   return c.toDataURL('image/png');
 }
 window.__cmd = (x, y) => farmScene.command(x * TILE + 8, y * TILE + 8); window.__glRas = glGroundRas;
-window.__glStat = () => ({ quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, decals: GSTAT.decals, sun: GSTAT.sun.map((v) => +v.toFixed(2)) }); window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
+window.__glStat = (ramp) => { if (ramp !== undefined) GLT.ramp = ramp; return { quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, decals: GSTAT.decals, ramp: GLT.ramp, sun: GSTAT.sun.map((v) => +v.toFixed(2)) }; }; window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
 window.__glBakes = glBakeCount; window.__glCapture = () => { window.__glCap = 1; return true; };
 window.__glPng = () => window.__glShot || '';
 window.__glRest = () => ({ restores: GLR.restores, ok2: GLR.ok2, ok: GLR.ok, progs: !!GLR.progs, h: typeof (glCv && glCv.onwebglcontextrestored) });

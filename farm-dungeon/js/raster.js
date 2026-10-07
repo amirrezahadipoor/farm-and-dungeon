@@ -98,15 +98,27 @@ export class Raster {
       for (let x = cx - dx; x <= cx + dx; x++) this.px(x, cy + dy, c);
     }
   }
-  // پاس outline: هر پیکسل شفافِ مجاور (۴همسایه) پیکسل بدنه → رنگ outline
+  // پاس outline: هر پیکسل شفافِ مجاور پیکسل بدنه → رنگ outline
+  // فاز ۳ (sel-out): رنگ از میانگین ۸همسایه‌ی بدنه گرفته می‌شود (تیره + شیفت سرد) نه یک رنگ ثابت
   outline(c) {
-    const mask = new Uint8Array(this.w * this.h);
-    for (let i = 0; i < this.w * this.h; i++) mask[i] = this.d[i * 4 + 3] > 200 ? 1 : 0;
-    for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) {
-      if (mask[y * this.w + x]) continue;
-      if ((x > 0 && mask[y * this.w + x - 1]) || (x < this.w - 1 && mask[y * this.w + x + 1]) ||
-          (y > 0 && mask[(y - 1) * this.w + x]) || (y < this.h - 1 && mask[(y + 1) * this.w + x]))
-        this.px(x, y, c);
+    const w = this.w, h = this.h, d = this.d, mask = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) mask[i] = d[i * 4 + 3] > 200 ? 1 : 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x;
+      if (mask[k]) continue;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const kk = yy * w + xx;
+        if (!mask[kk]) continue;
+        const j = kk * 4; r += d[j]; g += d[j + 1]; b += d[j + 2]; n++;
+      }
+      if (!n) continue;
+      let rr = (r / n) * 0.15 + c[0] * 0.5, gg = (g / n) * 0.15 + c[1] * 0.5, bb = (b / n) * 0.19 + c[2] * 0.5;
+      const L = 0.299 * rr + 0.587 * gg + 0.114 * bb; // سقف روشنایی: outline باید تیره بماند
+      if (L > 58) { const sc = 58 / L; rr *= sc; gg *= sc; bb *= sc; }
+      this.px(x, y, [rr | 0, gg | 0, bb | 0, c[3]]);
     }
   }
   // یک‌بار اسکن: اگر تمام پیکسل‌ها مات‌اند، over مسیر کپیِ ردیفی فوق‌سریع می‌گیرد

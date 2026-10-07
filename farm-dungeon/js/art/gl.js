@@ -6,6 +6,7 @@ export const GLT = {
   ground: 0, atlas: 0, ui: 0, wx: 0, cw: 512, ch: 384, n: 0,
   lights: new Float32Array(MAXL * 4), lightsC: new Float32Array(MAXL * 4),
   sun: new Float32Array([0.25, -0.6, 0.9]), sunC: new Float32Array([1, 0.96, 0.9, 0.4]), relief: 1,
+  rim: new Float32Array([0.7, -0.7, 0.3]), ramp: 1, // نور لبه + سوییچ رمپ (فاز ۳)
   dark: new Float32Array([13 / 255, 11 / 255, 26 / 255]),
 };
 
@@ -134,6 +135,8 @@ void main() {
 const FS_SPR = `#version 300 es
 precision mediump float;
 uniform sampler2D u_tex;
+uniform vec3 u_rim; // فاز ۳: نور لبه — xy جهت صفحه، z شدت
+uniform float u_ramp; // فاز ۳: ۱ = رمپ ۵پله‌ی هیو-شیفت، ۰ = سایه‌زنی نرم فاز ۲ (سوییچ A/B برای QA)
 in vec2 v_uv, v_sc, v_r01;
 in vec4 v_col;
 flat in float v_mode;
@@ -151,7 +154,19 @@ void main() {
   } else {                                       // روبه‌دوربین: نرمال رو به بالا-جلو
     vec3 n = normalize(vec3(0.0, -0.42, 1.0));
     float top = 1.0 - 0.10 * v_r01.y;
-    col = (c.rgb * (ambientAt(v_sc) + lightSum(v_sc, n)) + c.rgb * sunAt(n) * 0.8) * top;
+    vec3 shade = ambientAt(v_sc) + lightSum(v_sc, n) + sunAt(n) * 0.8;
+    // رمپ ۵ پله‌ی هیو-شیفت (فاز ۳): سایه سرد، هایلایت گرم — هیوی نورِ رنگی حفظ می‌شود
+    float li = max(luma3(shade), 0.001), q = clamp(li, 0.0, 1.45);
+    float lv = mix(clamp(q, 0.0, 1.0), clamp(floor(q * 2.9 + 0.02), 0.0, 4.0) * 0.25, u_ramp);
+    vec3 tint = mix(vec3(1.0), mix(vec3(0.72, 0.82, 1.24), vec3(1.18, 1.05, 0.82), lv), u_ramp);
+    col = c.rgb * (shade / li) * (0.34 + 0.92 * lv) * tint * top;
+    if (u_rim.z > 0.01) {                        // نور لبه: فقط مرزِ سمتِ نور (از کانال آلفا)
+      vec2 px = fwidth(v_r01), rd = u_rim.xy;
+      float aN = texture(u_tex, v_uv - rd * px * 1.4).a, aF = texture(u_tex, v_uv + rd * px * 1.4).a;
+      float e = (aN < 0.4 && aF > 0.55) ? 1.0 : 0.0;
+      e += texture(u_tex, v_uv - vec2(0.0, px.y * 1.4)).a < 0.4 ? 0.35 : 0.0;
+      col += mix(c.rgb, vec3(1.0, 0.98, 0.9), 0.45) * e * u_rim.z;
+    }
   }
   o = vec4(mix(col, vec3(1.0), u_flash), c.a);
 }`;

@@ -1,7 +1,7 @@
 // render_gl.js — مسیر رندر HD-2D (فاز ۱+۲): دوربین دیوراما، زمین روی صفحه‌ی شیب‌دار با نرمال رویه‌ای و AO
 // از خودِ تکسچر، نورهای نقطه‌ای رنگی با N·L، خورشید/ماهِ چرخه‌ی روز، دکال‌های سایه/تماس، اسپرایت‌های
 // emissive و لایه‌های صفحه‌ای (افکت/آب‌وهوا/اسپلش/مینی‌مپ). منطق/سیو/نقشه دست‌نخورده؛ CPU = fallback.
-import { glFrame, glPush, glFlushSprites, glOverlay, glGround, glUi, glWx, glLayer, glLights, glSun, GLT, GLR } from './art/gl.js';
+import { glFrame, glPush, glFlushSprites, glOverlay, glGround, glUi, glWx, glLayer, glLights, glSun, glRim, GLT, GLR } from './art/gl.js';
 import { glAtlas } from './art/gl_batch.js';
 import { BK, textRec, minimapRec } from './art/glbake.js';
 import { Raster } from './raster.js';
@@ -54,7 +54,7 @@ function pushDecal(w, h, k, wx, wy, objH, sc) {
   if (!d) d = DEC[dn] = {};
   d.rec = t; d.ax = x; d.ay = y; d.col = W4; dn++;
 }
-let dnStat = 0;
+let dnStat = 0, scene_gl_farm = true;
 // حوضه‌ی نور روی زمین (کارت lightmap، بدون نورپردازی مجدد — mode 3)
 function pushPool(kind, cx, cy, r, peak) {
   if (dn >= 90) return;
@@ -112,7 +112,6 @@ export function cycle(dayT, raining) {
   shX = (-sx / n2) * len; shY = (-sy / n2) * len * (GCAM.S * GCAM.A) / GCAM.A;
   return gold;
 }
-let scene_gl_farm = true;
 export function glTintDungeon() { GR.tint[0] = 1; GR.tint[1] = 1; GR.tint[2] = 1; GR.tint[3] = 142; } // تاریکی محیط عمیق (فاز ۲)
 // ---------- مزرعه ----------
 const HOUSE_WIN = [1, 0.76, 0.42];
@@ -125,7 +124,7 @@ function farmEnts(game, t, night, x0, y0, x1, y1) {
     if (!c) continue;
     if (c.kind === 'tree') {
       const v = c.variant & 1;
-      pushDecal(22, 13, 0.55, tx * TILE + 8, ty * TILE + 13, 14, 1);
+      pushDecal(22, 13, 0.55, tx * TILE + 8, ty * TILE + 13, 14, 1); // سایه‌ی تماس
       pushE(BK.tree(v, Math.round(Math.sin(t * 0.85 + tx * 0.9 + v * 2.1))), tx * TILE, ty * TILE, 8, 18, W4, 0, ty * TILE + TILE);
     } else if (c.kind === 'sign') { pushDecal(13, 8, 0.5, tx * TILE + 8, ty * TILE + 14, 5, 1); pushE(BK.sign(), tx * TILE, ty * TILE, 2, 4, W4, 0, ty * TILE + TILE); }
     else if (c.kind === 'scarecrow') { pushDecal(15, 9, 0.5, tx * TILE + 8, ty * TILE + 14, 9, 1); pushE(BK.scare(Math.floor(t * 1.4) & 1), tx * TILE, ty * TILE, 2, 4, W4, 0, ty * TILE + TILE); }
@@ -175,6 +174,12 @@ function runEnts(run, t, x0, y0, x1, y1) {
     pushE(textRec(txt, [230, 199, 74, 255], 'cb', 1), h.x - w * 0.5, h.y - 58, 2, 2, W4, 0, TOPY - 6);
   }
 }
+function rimRun(cx, cy) { // جهت نور لبه: از مرکز دوربین به‌سوی مرکز جرمِ نورهای صفحه‌ای
+  let dx = 0, dy = 0, s = 0;
+  for (let i = 0; i < GR.nl; i++) { const o = i * 4, w = GR.L[o + 3]; dx += (GR.L[o] - cx) * w; dy += (GR.L[o + 1] - cy) * w; s += w; }
+  const m = Math.hypot(dx, dy) || 1, k = s > 0.05 ? (Q.level ? 0.30 * Math.min(1, s) : 0.14) : 0;
+  glRim(k ? dx / m : 0.7, k ? dy / m : -0.7, k);
+}
 function lightsRun(run, t) {
   const D = run.dungeon;
   pushPool(1, run.hero.x, run.hero.y - 4, 88, 0.36); // هاله‌ی قهرمان روی زمین
@@ -189,11 +194,9 @@ function lightsRun(run, t) {
 function fxLayer(g, w, h) {
   const fx = g.fx;
   if (!fx.parts.length && !fx.slashes.length && !fx.floats.length) { GR.fxn = 0; return; }
-  if (!GR.fx || GR.fx.w !== w || GR.fx.h !== h) GR.fx = new Raster(w, h);
-  else GR.fx.clear();
+  if (!GR.fx || GR.fx.w !== w || GR.fx.h !== h) GR.fx = new Raster(w, h); else GR.fx.clear();
   fx.render(GR.fx, GCAM.cx - GCAM.W * 0.5, GCAM.cy - GCAM.H * 0.5);
-  glUi(GR.fx, w, h);
-  GR.fxn = 1;
+  glUi(GR.fx, w, h); GR.fxn = 1;
 }
 function wxLayer(g, W, H) {
   if (!isRaining(g.dayT)) { GR.wxn = 0; return; }
@@ -225,20 +228,21 @@ export function glScene(scene, farm, run, W, H, scale, fade, vig) {
   g.render(GR.ras);
   GR.ras.flatOnly = false; g.cam.x = ocx; g.cam.y = ocy; g.fx.shakeT = osh;
   glGround(GR.ras, gw, gh);
-  GR.nl = 0;
-  const t = g.time, rain = scene === 'farm' && isRaining(g.dayT);
-  GLT.relief = Q.level ? 1 : 0;
+  GR.nl = 0; const t = g.time, rain = scene === 'farm' && isRaining(g.dayT);
+  GLT.relief = Q.level ? 1 : 0; // گام پرسپکتیو/برجستگی فقط سطح کیفیت بالا
   if (scene === 'farm') {
-    cycle(g.dayT, rain);
+    cycle(g.dayT, rain); const sd = Math.hypot(shX, shY) || 1; // نور لبه از سمت خورشید (شب خفیف‌تر)
+    glRim(-shX / sd, -shY / sd, Q.level ? 0.30 * (0.45 + 0.55 * (1 - nightFactor(g.dayT))) : 0.12);
     GLR.flash = rain ? lightningK(g.dayT, t) * 0.26 : 0;
     farmEnts(g, t, nightFactor(g.dayT), x0, y0, x0 + gw, y0 + gh);
   } else {
     glSun([0, 0, 1], [0, 0, 0], 0); GSTAT.sun = [0, 0, 1, 0]; // داخل: خبری از خورشید نیست
     glTintDungeon(); GLR.flash = 0;
-    lightsRun(run, t); runEnts(run, t, x0, y0, x0 + gw, y0 + gh);
+    lightsRun(run, t); rimRun(cx, cy); // چراغ‌ها + جهت نور لبه
+    runEnts(run, t, x0, y0, x0 + gw, y0 + gh);
   }
-  GR.cam[0] = GCAM.cx; GR.cam[1] = GCAM.cy; GR.view[0] = W; GR.view[1] = H;
-  GR.ax[0] = GCAM.A; GR.ax[1] = sA; GR.org[0] = x0; GR.org[1] = y0; GR.tsz[0] = gw; GR.tsz[1] = gh;
+  GR.cam[0] = GCAM.cx; GR.cam[1] = GCAM.cy; GR.view[0] = W; GR.view[1] = H; GR.ax[0] = GCAM.A; GR.ax[1] = sA;
+  GR.org[0] = x0; GR.org[1] = y0; GR.tsz[0] = gw; GR.tsz[1] = gh;
   GLT.dark = GR.dark;
   glLights(GR.L, GR.LC, GR.nl);
   glFrame(GR.cam, GR.ax, GCAM.B, GR.view, GR.tint, GR.org, GR.tsz, Q.level ? 16 : 32);
@@ -257,17 +261,15 @@ export function glScene(scene, farm, run, W, H, scale, fade, vig) {
 function uiDungeon(run, W, H, ox, oy) {
   const h = run.hero, sp = run._splash, k = sp ? run.time - sp.t0 : -1;
   let any = false;
-  if (sp && k >= 0 && k < 2.2) {
-    const al = Math.min(1, k / 0.25, (2.2 - k) / 0.45);
-    const txt = t('floor') + ' ' + faNum(sp.n) + (sp.boss ? ' — ' + t('bossFloor') : '');
+  if (sp && k >= 0 && k < 2.2) { // اسپلش طبقه (لایه‌ی UI مسیر GPU)
+    const al = Math.min(1, k / 0.25, (2.2 - k) / 0.45), txt = t('floor') + ' ' + faNum(sp.n) + (sp.boss ? ' — ' + t('bossFloor') : '');
     const sc = 2, w = textW(txt, sc), col = sp.boss ? [226, 120, 120, 255] : [255, 224, 130, 255];
     pushE(textRec(txt, col, sp.boss ? 'bs' : 'fl', sc), W * 0.5 - w * 0.5 - 2 * sc, 30 - 2 * sc, 0, 0, [1, 1, 1, al], 1, TOPY);
     any = true;
   }
   const mini = run._mini;
   if (mini) {
-    const hsx = Math.round(h.x) - ox, hsy = Math.round(h.y) - oy, my = 3;
-    const mx = hsx < COLS + 30 && hsy < ROWS + 30 ? W - COLS - 8 : 3;
+    const hsx = Math.round(h.x) - ox, hsy = Math.round(h.y) - oy, my = 3, mx = hsx < COLS + 30 && hsy < ROWS + 30 ? W - COLS - 8 : 3;
     pushE(minimapRec(run, mini, t('floor') + ' ' + faNum(run.floor), [230, 199, 74, 255]), mx, my, 0, 0, W4, 1, TOPY + 1);
     if (Math.floor(run.time * 4) % 2 === 0) pushE(BK.white(), mx + Math.floor(h.x / TILE), my + Math.floor(h.y / TILE), 0, 1, W4, 1, TOPY + 2);
     const b = run.dungeon.enemies.find((e) => e.isBoss && !e.dead);

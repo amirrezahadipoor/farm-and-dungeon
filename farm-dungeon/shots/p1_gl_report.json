@@ -2,11 +2,11 @@
  "url": "http://localhost:8080/game.html?cpu=1",
  "errs": [],
  "shots": [
-  "p2cpucc_farm_day_dom.png",
-  "p2cpucc_farm_night_dom.png",
-  "p2cpucc_farm_rain_dom.png",
-  "p2cpucc_dungeon_dom.png",
-  "p2cpucc_battle_dom.png"
+  "p3cpuc_farm_day_dom.png",
+  "p3cpuc_farm_night_dom.png",
+  "p3cpuc_farm_rain_dom.png",
+  "p3cpuc_dungeon_dom.png",
+  "p3cpuc_battle_dom.png"
  ],
  "diag": [
   {
@@ -31,7 +31,7 @@
     349
    ],
    "scale": 4,
-   "ms": 0.36441170734958067,
+   "ms": 0.3939380082181474,
    "pngBytes": 0
   },
   {
@@ -56,7 +56,7 @@
     349
    ],
    "scale": 4,
-   "ms": 0.48076581432824383,
+   "ms": 0.4951785476087849,
    "pngBytes": 0
   },
   {
@@ -81,7 +81,7 @@
     349
    ],
    "scale": 4,
-   "ms": 0.46567019774342566,
+   "ms": 0.38792961731013964,
    "pngBytes": 0
   },
   {
@@ -106,7 +106,7 @@
     351
    ],
    "scale": 4,
-   "ms": 1.1224182010426025,
+   "ms": 1.1893251843719466,
    "pngBytes": 0
   },
   {
@@ -131,20 +131,20 @@
     351
    ],
    "scale": 4,
-   "ms": 1.392733663720744,
+   "ms": 1.5202021987682743,
    "pngBytes": 0
   }
  ],
  "battle": {
   "kind": "bat",
-  "x": 403.6721801530653,
-  "y": 35.9032707251269,
+  "x": 96.27371680174225,
+  "y": 121.46628430576794,
   "hp": 12
  },
  "fps": {
   "median": 16.7,
   "p90": 16.7,
-  "min": 16.6
+  "min": 16.5
  },
  "bakes": 0,
  "end": {
@@ -168,6 +168,6 @@
    351
   ],
   "scale": 4,
-  "ms": 1.0479691489212755
+  "ms": 1.0990628122911594
  }
 }

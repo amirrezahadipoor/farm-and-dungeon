@@ -263,7 +263,7 @@ function shotURL() {
   return c.toDataURL('image/png');
 }
 window.__cmd = (x, y) => farmScene.command(x * TILE + 8, y * TILE + 8); window.__glRas = glGroundRas;
-window.__glStat = () => ({ quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, decals: GSTAT.decals, sun: GSTAT.sun.map((v) => +v.toFixed(2)) }); window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
+window.__glStat = (ramp) => { if (ramp !== undefined) GLT.ramp = ramp; return { quads: GSTAT.quads, draws: GSTAT.draws, lights: GSTAT.lights, decals: GSTAT.decals, ramp: GLT.ramp, sun: GSTAT.sun.map((v) => +v.toFixed(2)) }; }; window.__glInv = glInv; window.__glProj = glProj; window.__glInit = glInit; window.__GLR = GLR; window.__glScene = glScene; window.__glCam = GCAM; window.__glAtlas = glAtlas;
 window.__glBakes = glBakeCount; window.__glCapture = () => { window.__glCap = 1; return true; };
 window.__glPng = () => window.__glShot || '';
 window.__glRest = () => ({ restores: GLR.restores, ok2: GLR.ok2, ok: GLR.ok, progs: !!GLR.progs, h: typeof (glCv && glCv.onwebglcontextrestored) });
